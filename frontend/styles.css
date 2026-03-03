@@ -229,3 +229,13 @@ header {
   opacity: 0.4; transition: opacity 0.2s;
 }
 .bookmark-btn:hover, .bookmark-btn.bookmarked { opacity: 1; }
+
+/* ── Mobile Responsive ── */
+@media (max-width: 600px) {
+  .header-inner { flex-direction: column; align-items: flex-start; gap: 8px; }
+  .status-bar { flex-wrap: wrap; gap: 8px; }
+  .user-email { display: none; }
+  .news-grid { grid-template-columns: 1fr; padding: 12px; gap: 12px; }
+  .auth-box { margin: 16px; padding: 24px; }
+  #sort-select { font-size: 11px; }
+}

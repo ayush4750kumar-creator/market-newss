@@ -43,7 +43,7 @@ function showMainPage() {
   document.getElementById('main-page').style.display = 'block';
   document.getElementById('user-email').textContent = currentUser?.email || '';
   loadUserPreferences();
-  fetchStocks();
+  fetchStocks(); // ✅ fetches user's personal watchlist
   fetchNews();
 }
 
@@ -61,7 +61,6 @@ async function login() {
   const password = document.getElementById('login-password').value;
   const err = document.getElementById('login-error');
   err.textContent = '';
-
   try {
     const res = await fetch(`${API_BASE}/api/auth/login`, {
       method: 'POST',
@@ -82,9 +81,7 @@ async function register() {
   const password = document.getElementById('reg-password').value;
   const err = document.getElementById('reg-error');
   err.textContent = '';
-
   if (password.length < 6) { err.textContent = 'Password must be at least 6 characters.'; return; }
-
   try {
     const res = await fetch(`${API_BASE}/api/auth/register`, {
       method: 'POST',
@@ -141,14 +138,18 @@ async function fetchNews() {
   }
 }
 
+// ✅ Now only shows user's personal watchlist, not global list
 async function fetchStocks() {
   try {
-    const res = await fetch(`${API_BASE}/api/stocks`);
-    const data = await res.json();
-    // merge default + user watchlist
     const userWatchlist = currentUser?.watchlist || [];
-    const merged = [...new Set([...data.stocks, ...userWatchlist])];
-    trackedStocks = merged;
+    // If user has their own watchlist, use it. Otherwise fall back to defaults.
+    if (userWatchlist.length > 0) {
+      trackedStocks = userWatchlist;
+    } else {
+      const res = await fetch(`${API_BASE}/api/stocks`);
+      const data = await res.json();
+      trackedStocks = data.stocks || [];
+    }
     renderStockTabs();
   } catch (e) {}
 }
@@ -256,15 +257,9 @@ function showAddStock() {
   if (stock) addStock(stock.trim().toUpperCase());
 }
 
+// ✅ Adds only to user's personal watchlist, not global
 async function addStock(symbol) {
   try {
-    // Add to global list
-    await fetch(`${API_BASE}/api/stocks`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ symbol })
-    });
-    // Add to user watchlist
     const watchlist = [...new Set([...(currentUser?.watchlist || []), symbol])];
     const res = await fetch(`${API_BASE}/api/auth/watchlist`, {
       method: 'PUT',
@@ -275,8 +270,15 @@ async function addStock(symbol) {
     currentUser.watchlist = data.watchlist;
     localStorage.setItem('user', JSON.stringify(currentUser));
 
+    // Also add to global pipeline so news gets fetched
+    await fetch(`${API_BASE}/api/stocks`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ symbol })
+    });
     await fetch(`${API_BASE}/api/refresh`, { method: 'POST' });
-    trackedStocks = [...new Set([...trackedStocks, symbol])];
+
+    trackedStocks = data.watchlist;
     renderStockTabs();
     alert(`✅ Added ${symbol}! News will appear in ~2 minutes.`);
   } catch (e) {
