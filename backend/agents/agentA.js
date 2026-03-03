@@ -52,18 +52,24 @@ async function runAgentA(articles) {
   console.log(`[Agent A] Analyzing ${articles.length} articles...`);
   console.log(`[Agent A] Groq key: ${config.GROQ_API_KEY ? 'FOUND' : 'NOT FOUND'}`);
 
+  // ✅ Only analyze top 20 articles to avoid Groq rate limits
+  const toAnalyze = articles.slice(0, 20);
+  const skipped = articles.slice(20).map(a => ({ ...a, sentiment: 'neutral', reason: 'Skipped' }));
+
   const results = [];
 
-  for (let i = 0; i < articles.length; i++) {
-    const result = await analyzeArticle(articles[i]);
+  for (let i = 0; i < toAnalyze.length; i++) {
+    const result = await analyzeArticle(toAnalyze[i]);
     results.push(result);
-    await new Promise(r => setTimeout(r, 3000)); // wait 2.5s between each
+    await new Promise(r => setTimeout(r, 4000)); // 4s between each
   }
 
+  const allResults = [...results, ...skipped];
+
   const categorized = {
-    bullish: results.filter(a => a.sentiment === 'bullish'),
-    bearish: results.filter(a => a.sentiment === 'bearish'),
-    neutral: results.filter(a => a.sentiment === 'neutral')
+    bullish: allResults.filter(a => a.sentiment === 'bullish'),
+    bearish: allResults.filter(a => a.sentiment === 'bearish'),
+    neutral: allResults.filter(a => a.sentiment === 'neutral')
   };
 
   console.log(`[Agent A] Bullish: ${categorized.bullish.length}, Bearish: ${categorized.bearish.length}, Neutral: ${categorized.neutral.length}`);
