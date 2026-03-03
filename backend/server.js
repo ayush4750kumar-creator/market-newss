@@ -27,10 +27,10 @@ async function runPipeline() {
   console.log('\n========== PIPELINE START ==========');
 
   try {
-    const [stockArticles, globalArticles] = await Promise.all([
-      runAgentO(trackedStocks),
-      runAgentP()
-    ]);
+    // ✅ Run sequentially to avoid Finnhub 429 rate limits
+    const stockArticles = await runAgentO(trackedStocks);
+    await new Promise(r => setTimeout(r, 2000));
+    const globalArticles = await runAgentP();
 
     const allRawArticles = [...stockArticles, ...globalArticles];
     console.log(`[Pipeline] Total raw articles: ${allRawArticles.length}`);
