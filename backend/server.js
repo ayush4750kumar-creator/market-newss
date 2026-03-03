@@ -22,10 +22,9 @@ let newsStore = {
   isRunning: false
 };
 
-// ✅ Start with only default stocks, user stocks get added from DB on startup
 let trackedStocks = [...config.DEFAULT_STOCKS];
 
-// ✅ Load all user watchlist stocks from DB so they get fetched by pipeline
+// ✅ Load all user watchlist stocks from DB so pipeline tracks them
 async function loadAllUserStocks() {
   try {
     const result = await pool.query('SELECT DISTINCT UNNEST(watchlist) as symbol FROM users');
@@ -44,7 +43,6 @@ async function runPipeline() {
   console.log('\n========== PIPELINE START ==========');
 
   try {
-    // ✅ Reload user stocks before every pipeline run
     await loadAllUserStocks();
 
     const stockArticles = await runAgentO(trackedStocks);
@@ -82,6 +80,35 @@ async function runPipeline() {
   }
 }
 
+// ✅ Mini pipeline - only fetches news for one specific stock
+async function runMiniPipeline(symbol) {
+  console.log(`[Mini Pipeline] Fetching news for ${symbol}...`);
+  try {
+    const { fetchFinnhubStock } = require('./services/newsFetcher');
+    const { filterNew } = require('./services/dedup');
+
+    const articles = await fetchFinnhubStock(symbol);
+    const newArticles = filterNew(articles);
+
+    if (newArticles.length === 0) {
+      console.log(`[Mini Pipeline] No new articles for ${symbol}`);
+      return;
+    }
+
+    const categorized = await runAgentA(newArticles);
+    const published = await runAgentB(categorized);
+
+    newsStore.all = [...published, ...newsStore.all].slice(0, 200);
+    if (!newsStore.byStock[symbol]) newsStore.byStock[symbol] = [];
+    newsStore.byStock[symbol] = [...published, ...newsStore.byStock[symbol]].slice(0, 50);
+    newsStore.lastUpdated = new Date().toISOString();
+
+    console.log(`[Mini Pipeline] Done for ${symbol}, published ${published.length} articles`);
+  } catch (err) {
+    console.error(`[Mini Pipeline] Error for ${symbol}:`, err.message);
+  }
+}
+
 // Auth routes
 app.use('/api/auth', authRouter);
 
@@ -110,7 +137,7 @@ app.get('/api/news/stock/:symbol', (req, res) => {
 });
 
 app.get('/api/stocks', (req, res) => {
-  res.json({ stocks: config.DEFAULT_STOCKS }); // always return defaults only
+  res.json({ stocks: config.DEFAULT_STOCKS });
 });
 
 app.post('/api/stocks', (req, res) => {
@@ -128,6 +155,14 @@ app.delete('/api/stocks/:symbol', (req, res) => {
   const symbol = req.params.symbol.toUpperCase();
   trackedStocks = trackedStocks.filter(s => s !== symbol);
   res.json({ stocks: trackedStocks });
+});
+
+// ✅ Mini pipeline route - triggered when user adds a new stock
+app.post('/api/stocks/fetch', async (req, res) => {
+  const { symbol } = req.body;
+  if (!symbol) return res.status(400).json({ error: 'Symbol required' });
+  res.json({ message: `Fetching news for ${symbol}...` });
+  runMiniPipeline(symbol.toUpperCase());
 });
 
 app.get('/api/status', (req, res) => {

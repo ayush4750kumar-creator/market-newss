@@ -119,7 +119,7 @@ async function savePreferences() {
 
 async function fetchNews() {
   try {
-    let url = `${API_BASE}/api/news/global?sort=${currentSort}`; // default global
+    let url = `${API_BASE}/api/news/global?sort=${currentSort}`;
     if (currentStock === 'bookmarks') { renderBookmarks(); return; }
     else if (currentStock === 'all') url = `${API_BASE}/api/news?limit=100&sort=${currentSort}`;
     else if (currentStock !== 'global') url = `${API_BASE}/api/news/stock/${currentStock}?sort=${currentSort}`;
@@ -138,11 +138,11 @@ async function fetchNews() {
   }
 }
 
-// ✅ Only show user's personal watchlist, empty for new users
+// ✅ Only show user's personal watchlist
 async function fetchStocks() {
   try {
     const userWatchlist = currentUser?.watchlist || [];
-    trackedStocks = userWatchlist; // new users get empty list
+    trackedStocks = userWatchlist;
     renderStockTabs();
   } catch (e) {}
 }
@@ -250,9 +250,10 @@ function showAddStock() {
   if (stock) addStock(stock.trim().toUpperCase());
 }
 
-// ✅ Only adds to user's personal watchlist
+// ✅ Adds to user watchlist + triggers mini pipeline immediately
 async function addStock(symbol) {
   try {
+    // Save to user watchlist
     const watchlist = [...new Set([...(currentUser?.watchlist || []), symbol])];
     const res = await fetch(`${API_BASE}/api/auth/watchlist`, {
       method: 'PUT',
@@ -263,16 +264,35 @@ async function addStock(symbol) {
     currentUser.watchlist = data.watchlist;
     localStorage.setItem('user', JSON.stringify(currentUser));
 
-    // Tell pipeline to track this symbol
+    // Add to pipeline tracking
     await fetch(`${API_BASE}/api/stocks`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ symbol })
     });
 
+    // ✅ Trigger mini pipeline just for this stock
+    await fetch(`${API_BASE}/api/stocks/fetch`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ symbol })
+    });
+
     trackedStocks = data.watchlist;
+    currentStock = symbol; // switch to the new stock tab
     renderStockTabs();
-    alert(`✅ Added ${symbol}! News will appear at next pipeline run (~15 mins).`);
+
+    // ✅ Poll every 5 seconds for up to 1 minute for news to appear
+    document.getElementById('news-grid').innerHTML = '<div class="loading">⏳ Fetching news for ' + symbol + '...</div>';
+    let attempts = 0;
+    const poll = setInterval(async () => {
+      attempts++;
+      await fetchNews();
+      if (attempts > 12) {
+        clearInterval(poll);
+      }
+    }, 5000);
+
   } catch (e) {
     alert('Could not add stock. Check backend.');
   }
