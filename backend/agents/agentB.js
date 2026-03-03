@@ -81,7 +81,7 @@ async function runAgentB(categorizedArticles) {
   for (let i = 0; i < allArticles.length; i++) {
     const published = await publishArticle(allArticles[i]);
     results.push(published);
-    await new Promise(r => setTimeout(r, 1500)); // wait 2.5s between each
+    await new Promise(r => setTimeout(r, 3000)); // wait 2.5s between each
   }
 
   console.log(`[Agent B] Published ${results.length} news cards`);
