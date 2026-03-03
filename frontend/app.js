@@ -43,7 +43,7 @@ function showMainPage() {
   document.getElementById('main-page').style.display = 'block';
   document.getElementById('user-email').textContent = currentUser?.email || '';
   loadUserPreferences();
-  fetchStocks(); // ✅ fetches user's personal watchlist
+  fetchStocks();
   fetchNews();
 }
 
@@ -138,11 +138,10 @@ async function fetchNews() {
   }
 }
 
-// ✅ Now only shows user's personal watchlist, not global list
+// ✅ Only shows user's personal watchlist
 async function fetchStocks() {
   try {
     const userWatchlist = currentUser?.watchlist || [];
-    // If user has their own watchlist, use it. Otherwise fall back to defaults.
     if (userWatchlist.length > 0) {
       trackedStocks = userWatchlist;
     } else {
@@ -257,7 +256,7 @@ function showAddStock() {
   if (stock) addStock(stock.trim().toUpperCase());
 }
 
-// ✅ Adds only to user's personal watchlist, not global
+// ✅ Adds only to user's personal watchlist
 async function addStock(symbol) {
   try {
     const watchlist = [...new Set([...(currentUser?.watchlist || []), symbol])];
@@ -270,34 +269,26 @@ async function addStock(symbol) {
     currentUser.watchlist = data.watchlist;
     localStorage.setItem('user', JSON.stringify(currentUser));
 
-    // Also add to global pipeline so news gets fetched
+    // Add to global pipeline so news gets fetched for this symbol
     await fetch(`${API_BASE}/api/stocks`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ symbol })
     });
-    await fetch(`${API_BASE}/api/refresh`, { method: 'POST' });
 
     trackedStocks = data.watchlist;
     renderStockTabs();
-    alert(`✅ Added ${symbol}! News will appear in ~2 minutes.`);
+    alert(`✅ Added ${symbol}! News will appear at next pipeline run.`);
   } catch (e) {
     alert('Could not add stock. Check backend.');
   }
 }
 
+// ✅ Just fetches latest news for this user, doesn't trigger pipeline
 async function refreshNow() {
-  document.getElementById('refresh-btn').textContent = '⟳ Running...';
-  await fetch(`${API_BASE}/api/refresh`, { method: 'POST' });
-  let attempts = 0;
-  const poll = setInterval(async () => {
-    attempts++;
-    await fetchNews();
-    if (attempts > 10) {
-      clearInterval(poll);
-      document.getElementById('refresh-btn').textContent = '⟳ Refresh';
-    }
-  }, 3000);
+  document.getElementById('refresh-btn').textContent = '⟳ Loading...';
+  await fetchNews();
+  document.getElementById('refresh-btn').textContent = '⟳ Refresh';
 }
 
 // ─── Utils ───────────────────────────────────────────────────────────────────
