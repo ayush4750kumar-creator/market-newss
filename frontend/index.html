@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MarketPulse — Live Market News</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <div class="header-inner">
+      <div class="logo">📈 MarketPulse</div>
+      <div class="status-bar">
+        <span id="last-updated">Loading...</span>
+        <button id="refresh-btn" onclick="refreshNow()">⟳ Refresh</button>
+      </div>
+    </div>
+    <div class="stock-tabs" id="stock-tabs">
+      <button class="tab active" onclick="filterByStock('all')">All</button>
+      <button class="tab" onclick="filterByStock('global')">🌍 Global</button>
+    </div>
+    <div class="sentiment-filters">
+      <button class="sentiment-btn all active" onclick="filterBySentiment('all')">All</button>
+      <button class="sentiment-btn bullish" onclick="filterBySentiment('bullish')">📈 Bullish</button>
+      <button class="sentiment-btn bearish" onclick="filterBySentiment('bearish')">📉 Bearish</button>
+      <button class="sentiment-btn neutral" onclick="filterBySentiment('neutral')">➡️ Neutral</button>
+    </div>
+  </header>
+
+  <main id="news-grid" class="news-grid">
+    <div class="loading">Loading market news...</div>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
