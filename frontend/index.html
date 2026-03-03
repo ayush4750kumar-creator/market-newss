@@ -2,32 +2,30 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>MarketPulse — Live Market News</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>MarketPulse</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
 
-  <!-- ── Auth Page ── -->
-  <div id="auth-page" style="display:none; justify-content:center; align-items:center; min-height:100vh; background:#1c2b4a;">
-    <div class="auth-box">
-      <h1 class="auth-logo">📈 MarketPulse</h1>
-      <p class="auth-sub">Your personalized stock news feed</p>
+  <!-- Toast notification -->
+  <div id="toast" class="toast"></div>
 
+  <!-- Auth Page -->
+  <div id="auth-page" style="display:none; justify-content:center; align-items:center; min-height:100vh; background:#0a0a0a;">
+    <div class="auth-box">
+      <h1 class="auth-logo">MarketPulse</h1>
+      <p class="auth-sub">Real-time market intelligence</p>
       <div class="auth-tabs">
         <button class="auth-tab active" onclick="switchTab('login')">Login</button>
         <button class="auth-tab" onclick="switchTab('register')">Register</button>
       </div>
-
-      <!-- Login -->
       <div id="login-form">
         <input id="login-email" type="email" placeholder="Email" class="auth-input" />
         <input id="login-password" type="password" placeholder="Password" class="auth-input" />
         <p id="login-error" class="auth-error"></p>
         <button class="auth-btn" onclick="login()">Login</button>
       </div>
-
-      <!-- Register -->
       <div id="register-form" style="display:none">
         <input id="reg-email" type="email" placeholder="Email" class="auth-input" />
         <input id="reg-password" type="password" placeholder="Password (min 6 chars)" class="auth-input" />
@@ -37,31 +35,43 @@
     </div>
   </div>
 
-  <!-- ── Main Page ── -->
+  <!-- Main Page -->
   <div id="main-page" style="display:none">
     <header>
       <div class="header-inner">
-        <div class="logo">📈 MarketPulse</div>
+        <div class="logo">MarketPulse</div>
         <div class="status-bar">
-          <span id="last-updated">Loading...</span>
-          <span id="user-email" class="user-email"></span>
+          <span id="last-updated"></span>
+          <span id="user-email"></span>
           <select id="sort-select" onchange="changeSort()">
-            <option value="newest">Newest First</option>
-            <option value="oldest">Oldest First</option>
+            <option value="newest">Newest</option>
+            <option value="oldest">Oldest</option>
           </select>
-          <button id="refresh-btn" onclick="refreshNow()">⟳ Refresh</button>
+          <button id="refresh-btn" onclick="refreshNow()">Refresh</button>
           <button class="logout-btn" onclick="logout()">Logout</button>
         </div>
       </div>
-      <div class="stock-tabs" id="stock-tabs">
-        <button class="tab active" onclick="filterByStock('all')">All</button>
-        <button class="tab" onclick="filterByStock('global')">🌍 Global</button>
+
+      <!-- Search bar -->
+      <div class="search-wrap">
+        <input
+          id="stock-search"
+          class="search-bar"
+          type="text"
+          placeholder="Search or add a stock symbol (e.g. NVDA, NFLX)..."
+          onkeydown="handleSearch(event)"
+        />
       </div>
+
+      <!-- Stock tabs -->
+      <div class="stock-tabs" id="stock-tabs"></div>
+
+      <!-- Sentiment filters -->
       <div class="sentiment-filters">
         <button class="sentiment-btn all active" onclick="filterBySentiment('all')">All</button>
-        <button class="sentiment-btn bullish" onclick="filterBySentiment('bullish')">📈 Bullish</button>
-        <button class="sentiment-btn bearish" onclick="filterBySentiment('bearish')">📉 Bearish</button>
-        <button class="sentiment-btn neutral" onclick="filterBySentiment('neutral')">➡️ Neutral</button>
+        <button class="sentiment-btn bullish" onclick="filterBySentiment('bullish')">Bullish</button>
+        <button class="sentiment-btn bearish" onclick="filterBySentiment('bearish')">Bearish</button>
+        <button class="sentiment-btn neutral" onclick="filterBySentiment('neutral')">Neutral</button>
       </div>
     </header>
 

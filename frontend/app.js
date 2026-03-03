@@ -1,12 +1,21 @@
 const API_BASE = 'https://market-newss-production.up.railway.app';
 
-let currentStock = 'global'; // ✅ new users start on global
+let currentStock = 'global';
 let currentSentiment = 'all';
 let currentSort = 'newest';
 let allNews = [];
 let trackedStocks = [];
 let token = localStorage.getItem('token');
 let currentUser = JSON.parse(localStorage.getItem('user') || 'null');
+
+// ─── Toast ───────────────────────────────────────────────────────────────────
+
+function showToast(msg, duration = 3000) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), duration);
+}
 
 // ─── Auth ───────────────────────────────────────────────────────────────────
 
@@ -134,11 +143,10 @@ async function fetchNews() {
     renderNews();
   } catch (err) {
     document.getElementById('news-grid').innerHTML =
-      '<div class="loading">⚠️ Could not connect to server.</div>';
+      '<div class="loading">Could not connect to server.</div>';
   }
 }
 
-// ✅ Only show user's personal watchlist
 async function fetchStocks() {
   try {
     const userWatchlist = currentUser?.watchlist || [];
@@ -166,15 +174,15 @@ function renderNews() {
     <div class="news-card ${item.sentiment}">
       <div class="card-body">
         <div class="card-meta">
-          <span class="stock-badge">${item.stock || '🌍 GLOBAL'}</span>
+          <span class="stock-badge">${item.stock || 'GLOBAL'}</span>
           <span class="time-label">${timeAgo(item.publishedAt)}</span>
           <button class="bookmark-btn ${isBookmarked ? 'bookmarked' : ''}" onclick="toggleBookmark(event, ${JSON.stringify(item).replace(/"/g, '&quot;')})">
-            ${isBookmarked ? '🔖' : '🏷️'}
+            ${isBookmarked ? 'Saved' : 'Save'}
           </button>
         </div>
         <div class="card-headline" onclick="window.open('${item.url || '#'}', '_blank')">${item.headline}</div>
         <div class="card-story">${item.story}</div>
-        <div class="sentiment-tag ${item.sentiment}">${item.sentimentLabel || ''}</div>
+        <div class="sentiment-tag ${item.sentiment}">${item.sentiment === 'bullish' ? 'Bullish' : item.sentiment === 'bearish' ? 'Bearish' : 'Neutral'}</div>
         <div class="card-source">${item.source}</div>
       </div>
     </div>
@@ -185,7 +193,7 @@ function renderBookmarks() {
   const grid = document.getElementById('news-grid');
   const bookmarks = currentUser?.bookmarks || [];
   if (bookmarks.length === 0) {
-    grid.innerHTML = '<div class="loading">No bookmarks yet. Click 🏷️ on any article to save it.</div>';
+    grid.innerHTML = '<div class="loading">No saved articles yet. Click Save on any article.</div>';
     return;
   }
   allNews = bookmarks;
@@ -197,16 +205,15 @@ function renderStockTabs() {
   const stockTabsHTML = trackedStocks.map(s => `
     <div class="tab-wrap">
       <button class="tab ${currentStock === s ? 'active' : ''}" onclick="filterByStock('${s}')">${s}</button>
-      <button class="tab-remove" onclick="removeStock('${s}')" title="Remove">✕</button>
+      <button class="tab-remove" onclick="removeStock('${s}')">Remove</button>
     </div>
   `).join('');
 
   container.innerHTML = `
-    <button class="tab ${currentStock === 'global' ? 'active' : ''}" onclick="filterByStock('global')">🌍 Global</button>
+    <button class="tab ${currentStock === 'global' ? 'active' : ''}" onclick="filterByStock('global')">Global</button>
     <button class="tab ${currentStock === 'all' ? 'active' : ''}" onclick="filterByStock('all')">All</button>
-    <button class="tab ${currentStock === 'bookmarks' ? 'active' : ''}" onclick="filterByStock('bookmarks')">🔖 Saved</button>
+    <button class="tab ${currentStock === 'bookmarks' ? 'active' : ''}" onclick="filterByStock('bookmarks')">Saved</button>
     ${stockTabsHTML}
-    <button class="tab" onclick="showAddStock()" style="border-style:dashed">+ Add Stock</button>
   `;
 }
 
@@ -245,11 +252,11 @@ async function toggleBookmark(e, article) {
     currentUser.bookmarks = data.bookmarks;
     localStorage.setItem('user', JSON.stringify(currentUser));
     renderNews();
+    showToast(article.id && currentUser.bookmarks.find(b => b.id === article.id) ? 'Article saved.' : 'Article removed.');
   } catch (e) {}
 }
 
 async function removeStock(symbol) {
-  if (!confirm(`Remove ${symbol} from your watchlist?`)) return;
   try {
     const watchlist = (currentUser?.watchlist || []).filter(s => s !== symbol);
     const res = await fetch(`${API_BASE}/api/auth/watchlist`, {
@@ -264,20 +271,30 @@ async function removeStock(symbol) {
     if (currentStock === symbol) currentStock = 'global';
     renderStockTabs();
     fetchNews();
+    showToast(symbol + ' removed from watchlist.');
   } catch (e) {
-    alert('Could not remove stock.');
+    showToast('Could not remove stock.');
   }
 }
 
-function showAddStock() {
-  const stock = prompt('Enter stock symbol (e.g. TCS, NVDA, META):');
-  if (stock) addStock(stock.trim().toUpperCase());
+// ─── Search + Add Stock ──────────────────────────────────────────────────────
+
+function handleSearch(e) {
+  if (e.key === 'Enter') {
+    const val = document.getElementById('stock-search').value.trim().toUpperCase();
+    if (!val) return;
+    document.getElementById('stock-search').value = '';
+    if (trackedStocks.includes(val)) {
+      filterByStock(val);
+      showToast('Switched to ' + val);
+    } else {
+      addStock(val);
+    }
+  }
 }
 
-// ✅ Adds to user watchlist + triggers mini pipeline immediately
 async function addStock(symbol) {
   try {
-    // Save to user watchlist
     const watchlist = [...new Set([...(currentUser?.watchlist || []), symbol])];
     const res = await fetch(`${API_BASE}/api/auth/watchlist`, {
       method: 'PUT',
@@ -288,14 +305,12 @@ async function addStock(symbol) {
     currentUser.watchlist = data.watchlist;
     localStorage.setItem('user', JSON.stringify(currentUser));
 
-    // Add to pipeline tracking
     await fetch(`${API_BASE}/api/stocks`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ symbol })
     });
 
-    // ✅ Trigger mini pipeline just for this stock
     await fetch(`${API_BASE}/api/stocks/fetch`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -303,30 +318,32 @@ async function addStock(symbol) {
     });
 
     trackedStocks = data.watchlist;
-    currentStock = symbol; // switch to the new stock tab
+    currentStock = symbol;
     renderStockTabs();
+    showToast(symbol + ' added. Fetching news...');
+    document.getElementById('news-grid').innerHTML = '<div class="loading">Fetching news for ' + symbol + '...</div>';
 
-    // ✅ Poll every 5 seconds for up to 1 minute for news to appear
-    document.getElementById('news-grid').innerHTML = '<div class="loading">⏳ Fetching news for ' + symbol + '...</div>';
     let attempts = 0;
     const poll = setInterval(async () => {
       attempts++;
       await fetchNews();
       if (attempts > 12) {
         clearInterval(poll);
+        showToast('Done fetching news for ' + symbol);
       }
     }, 5000);
 
   } catch (e) {
-    alert('Could not add stock. Check backend.');
+    showToast('Could not add stock. Try again.');
   }
 }
 
-// ✅ Just fetches latest news, doesn't trigger pipeline
+// ─── Refresh ─────────────────────────────────────────────────────────────────
+
 async function refreshNow() {
-  document.getElementById('refresh-btn').textContent = '⟳ Loading...';
+  document.getElementById('refresh-btn').textContent = 'Loading...';
   await fetchNews();
-  document.getElementById('refresh-btn').textContent = '⟳ Refresh';
+  document.getElementById('refresh-btn').textContent = 'Refresh';
 }
 
 // ─── Utils ───────────────────────────────────────────────────────────────────
