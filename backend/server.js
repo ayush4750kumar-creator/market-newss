@@ -6,10 +6,13 @@ const { runAgentO } = require('./agents/agentO');
 const { runAgentP } = require('./agents/agentP');
 const { runAgentA } = require('./agents/agentA');
 const { runAgentB } = require('./agents/agentB');
+const { initDB } = require('./services/database');
+const { router: authRouter, authenticate } = require('./routes/auth');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+app.use(express.static('public'));
 
 let newsStore = {
   all: [],
@@ -27,7 +30,6 @@ async function runPipeline() {
   console.log('\n========== PIPELINE START ==========');
 
   try {
-    // ✅ Run sequentially to avoid Finnhub 429 rate limits
     const stockArticles = await runAgentO(trackedStocks);
     await new Promise(r => setTimeout(r, 2000));
     const globalArticles = await runAgentP();
@@ -63,24 +65,43 @@ async function runPipeline() {
   }
 }
 
+// Auth routes
+app.use('/api/auth', authRouter);
+
+// News routes
 app.get('/api/news', (req, res) => {
-  const { sentiment, stock, limit = 50 } = req.query;
+  const { sentiment, stock, limit = 50, sort = 'newest' } = req.query;
   let news = stock ? (newsStore.byStock[stock] || []) : newsStore.all;
-  if (sentiment) news = news.filter(n => n.sentiment === sentiment);
+  if (sentiment && sentiment !== 'all') news = news.filter(n => n.sentiment === sentiment);
+  if (sort === 'oldest') news = [...news].reverse();
   res.json({ news: news.slice(0, parseInt(limit)), lastUpdated: newsStore.lastUpdated, total: news.length });
 });
 
 app.get('/api/news/global', (req, res) => {
-  res.json({ news: newsStore.global, lastUpdated: newsStore.lastUpdated });
+  const { sort = 'newest' } = req.query;
+  let news = [...newsStore.global];
+  if (sort === 'oldest') news = news.reverse();
+  res.json({ news, lastUpdated: newsStore.lastUpdated });
 });
 
 app.get('/api/news/stock/:symbol', (req, res) => {
   const symbol = req.params.symbol.toUpperCase();
-  res.json({ stock: symbol, news: newsStore.byStock[symbol] || [], lastUpdated: newsStore.lastUpdated });
+  const { sort = 'newest' } = req.query;
+  let news = [...(newsStore.byStock[symbol] || [])];
+  if (sort === 'oldest') news = news.reverse();
+  res.json({ stock: symbol, news, lastUpdated: newsStore.lastUpdated });
 });
 
 app.get('/api/stocks', (req, res) => {
   res.json({ stocks: trackedStocks });
+});
+
+// User watchlist as their personal stocks
+app.get('/api/user/stocks', authenticate, async (req, res) => {
+  const { pool } = require('./services/database');
+  const result = await pool.query('SELECT watchlist FROM users WHERE id = $1', [req.user.id]);
+  const watchlist = result.rows[0]?.watchlist || trackedStocks;
+  res.json({ stocks: watchlist });
 });
 
 app.post('/api/stocks', (req, res) => {
@@ -115,12 +136,17 @@ app.get('/api/status', (req, res) => {
   });
 });
 
-app.listen(config.PORT, () => {
-  console.log(`✅ Server running on http://localhost:${config.PORT}`);
-  console.log(`📊 Tracking stocks: ${trackedStocks.join(', ')}`);
-  runPipeline();
-  cron.schedule(`*/${config.REFRESH_INTERVAL} * * * *`, () => {
-    console.log('[Cron] Scheduled pipeline run...');
+initDB().then(() => {
+  app.listen(config.PORT, () => {
+    console.log(`✅ Server running on http://localhost:${config.PORT}`);
+    console.log(`📊 Tracking stocks: ${trackedStocks.join(', ')}`);
     runPipeline();
+    cron.schedule(`*/${config.REFRESH_INTERVAL} * * * *`, () => {
+      console.log('[Cron] Scheduled pipeline run...');
+      runPipeline();
+    });
   });
+}).catch(err => {
+  console.error('[DB] Failed to initialize:', err.message);
+  process.exit(1);
 });
