@@ -1,4 +1,4 @@
-const API_BASE = 'https://market-newss-production.up.railway.app'; // 
+const API_BASE = 'https://market-newss-production.up.railway.app'; 
 
 let currentStock = 'all';
 let currentSentiment = 'all';
@@ -7,9 +7,9 @@ let trackedStocks = [];
 
 async function fetchNews() {
   try {
-    let url = `${API_BASE}/news?limit=100`;
-    if (currentStock === 'global') url = `${API_BASE}/news/global`;
-    else if (currentStock !== 'all') url = `${API_BASE}/news/stock/${currentStock}`;
+    let url = `${API_BASE}/api/news?limit=100`;
+    if (currentStock === 'global') url = `${API_BASE}/api/news/global`;
+    else if (currentStock !== 'all') url = `${API_BASE}/api/news/stock/${currentStock}`;
 
     const res = await fetch(url);
     const data = await res.json();
@@ -27,7 +27,7 @@ async function fetchNews() {
 
 async function fetchStocks() {
   try {
-    const res = await fetch(`${API_BASE}/stocks`);
+    const res = await fetch(`${API_BASE}/api/stocks`);
     const data = await res.json();
     trackedStocks = data.stocks || [];
     renderStockTabs();
@@ -97,7 +97,7 @@ function showAddStock() {
 
 async function addStock(symbol) {
   try {
-    const res = await fetch(`${API_BASE}/stocks`, {
+    const res = await fetch(`${API_BASE}/api/stocks`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ symbol })
@@ -105,8 +105,7 @@ async function addStock(symbol) {
     const data = await res.json();
     trackedStocks = data.stocks;
     renderStockTabs();
-    // trigger pipeline to fetch news for new stock
-    await fetch(`${API_BASE}/refresh`, { method: 'POST' });
+    await fetch(`${API_BASE}/api/refresh`, { method: 'POST' });
     alert(`✅ Added ${symbol}! News will appear in ~2 minutes.`);
   } catch (e) {
     alert('Could not add stock. Check backend.');
@@ -115,8 +114,7 @@ async function addStock(symbol) {
 
 async function refreshNow() {
   document.getElementById('refresh-btn').textContent = '⟳ Running...';
-  await fetch(`${API_BASE}/refresh`, { method: 'POST' });
-  // poll every 3 seconds until new data arrives
+  await fetch(`${API_BASE}/api/refresh`, { method: 'POST' });
   let attempts = 0;
   const poll = setInterval(async () => {
     attempts++;
@@ -143,4 +141,4 @@ function sentimentEmoji(s) {
 
 fetchStocks();
 fetchNews();
-setInterval(fetchNews, 30000); // auto refresh every 30 seconds
+setInterval(fetchNews, 30000);
