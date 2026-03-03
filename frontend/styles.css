@@ -13,7 +13,7 @@ html, body {
 
 /* ── Header ── */
 header {
-  background: linear-gradient(135deg, #ffffff 0%, #1a1a4e 50%, #0a0a2e 100%);
+  background: linear-gradient(135deg, hsl(235, 100%, 50%) 0%, hsl(235, 100%, 50%),hsl(235, 100%, 50%));
   border-bottom: 1px solid hwb(0 100% 0%);
   padding: 12px 20px 0;
   position: sticky;
