@@ -1,6 +1,6 @@
 const API_BASE = 'https://market-newss-production.up.railway.app';
 
-let currentStock = 'all';
+let currentStock = 'global'; // ✅ new users start on global
 let currentSentiment = 'all';
 let currentSort = 'newest';
 let allNews = [];
@@ -119,10 +119,10 @@ async function savePreferences() {
 
 async function fetchNews() {
   try {
-    let url = `${API_BASE}/api/news?limit=100&sort=${currentSort}`;
-    if (currentStock === 'global') url = `${API_BASE}/api/news/global?sort=${currentSort}`;
-    else if (currentStock === 'bookmarks') { renderBookmarks(); return; }
-    else if (currentStock !== 'all') url = `${API_BASE}/api/news/stock/${currentStock}?sort=${currentSort}`;
+    let url = `${API_BASE}/api/news/global?sort=${currentSort}`; // default global
+    if (currentStock === 'bookmarks') { renderBookmarks(); return; }
+    else if (currentStock === 'all') url = `${API_BASE}/api/news?limit=100&sort=${currentSort}`;
+    else if (currentStock !== 'global') url = `${API_BASE}/api/news/stock/${currentStock}?sort=${currentSort}`;
 
     const res = await fetch(url, { headers: authHeaders() });
     const data = await res.json();
@@ -138,17 +138,11 @@ async function fetchNews() {
   }
 }
 
-// ✅ Only shows user's personal watchlist
+// ✅ Only show user's personal watchlist, empty for new users
 async function fetchStocks() {
   try {
     const userWatchlist = currentUser?.watchlist || [];
-    if (userWatchlist.length > 0) {
-      trackedStocks = userWatchlist;
-    } else {
-      const res = await fetch(`${API_BASE}/api/stocks`);
-      const data = await res.json();
-      trackedStocks = data.stocks || [];
-    }
+    trackedStocks = userWatchlist; // new users get empty list
     renderStockTabs();
   } catch (e) {}
 }
@@ -205,11 +199,11 @@ function renderStockTabs() {
   ).join('');
 
   container.innerHTML = `
-    <button class="tab ${currentStock === 'all' ? 'active' : ''}" onclick="filterByStock('all')">All</button>
     <button class="tab ${currentStock === 'global' ? 'active' : ''}" onclick="filterByStock('global')">🌍 Global</button>
+    <button class="tab ${currentStock === 'all' ? 'active' : ''}" onclick="filterByStock('all')">All</button>
     <button class="tab ${currentStock === 'bookmarks' ? 'active' : ''}" onclick="filterByStock('bookmarks')">🔖 Saved</button>
     ${stockTabsHTML}
-    <button class="tab" onclick="showAddStock()" style="border-style:dashed">+ Add</button>
+    <button class="tab" onclick="showAddStock()" style="border-style:dashed">+ Add Stock</button>
   `;
 }
 
@@ -256,7 +250,7 @@ function showAddStock() {
   if (stock) addStock(stock.trim().toUpperCase());
 }
 
-// ✅ Adds only to user's personal watchlist
+// ✅ Only adds to user's personal watchlist
 async function addStock(symbol) {
   try {
     const watchlist = [...new Set([...(currentUser?.watchlist || []), symbol])];
@@ -269,7 +263,7 @@ async function addStock(symbol) {
     currentUser.watchlist = data.watchlist;
     localStorage.setItem('user', JSON.stringify(currentUser));
 
-    // Add to global pipeline so news gets fetched for this symbol
+    // Tell pipeline to track this symbol
     await fetch(`${API_BASE}/api/stocks`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -278,13 +272,13 @@ async function addStock(symbol) {
 
     trackedStocks = data.watchlist;
     renderStockTabs();
-    alert(`✅ Added ${symbol}! News will appear at next pipeline run.`);
+    alert(`✅ Added ${symbol}! News will appear at next pipeline run (~15 mins).`);
   } catch (e) {
     alert('Could not add stock. Check backend.');
   }
 }
 
-// ✅ Just fetches latest news for this user, doesn't trigger pipeline
+// ✅ Just fetches latest news, doesn't trigger pipeline
 async function refreshNow() {
   document.getElementById('refresh-btn').textContent = '⟳ Loading...';
   await fetchNews();

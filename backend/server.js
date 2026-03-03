@@ -6,7 +6,7 @@ const { runAgentO } = require('./agents/agentO');
 const { runAgentP } = require('./agents/agentP');
 const { runAgentA } = require('./agents/agentA');
 const { runAgentB } = require('./agents/agentB');
-const { initDB } = require('./services/database');
+const { initDB, pool } = require('./services/database');
 const { router: authRouter, authenticate } = require('./routes/auth');
 
 const app = express();
@@ -22,7 +22,21 @@ let newsStore = {
   isRunning: false
 };
 
+// ✅ Start with only default stocks, user stocks get added from DB on startup
 let trackedStocks = [...config.DEFAULT_STOCKS];
+
+// ✅ Load all user watchlist stocks from DB so they get fetched by pipeline
+async function loadAllUserStocks() {
+  try {
+    const result = await pool.query('SELECT DISTINCT UNNEST(watchlist) as symbol FROM users');
+    const userSymbols = result.rows.map(r => r.symbol.toUpperCase());
+    const merged = [...new Set([...trackedStocks, ...userSymbols])];
+    trackedStocks = merged;
+    console.log(`[Pipeline] Tracking ${trackedStocks.length} stocks: ${trackedStocks.join(', ')}`);
+  } catch (err) {
+    console.error('[Pipeline] Could not load user stocks:', err.message);
+  }
+}
 
 async function runPipeline() {
   if (newsStore.isRunning) return;
@@ -30,6 +44,9 @@ async function runPipeline() {
   console.log('\n========== PIPELINE START ==========');
 
   try {
+    // ✅ Reload user stocks before every pipeline run
+    await loadAllUserStocks();
+
     const stockArticles = await runAgentO(trackedStocks);
     await new Promise(r => setTimeout(r, 2000));
     const globalArticles = await runAgentP();
@@ -93,15 +110,7 @@ app.get('/api/news/stock/:symbol', (req, res) => {
 });
 
 app.get('/api/stocks', (req, res) => {
-  res.json({ stocks: trackedStocks });
-});
-
-// User watchlist as their personal stocks
-app.get('/api/user/stocks', authenticate, async (req, res) => {
-  const { pool } = require('./services/database');
-  const result = await pool.query('SELECT watchlist FROM users WHERE id = $1', [req.user.id]);
-  const watchlist = result.rows[0]?.watchlist || trackedStocks;
-  res.json({ stocks: watchlist });
+  res.json({ stocks: config.DEFAULT_STOCKS }); // always return defaults only
 });
 
 app.post('/api/stocks', (req, res) => {
@@ -121,11 +130,6 @@ app.delete('/api/stocks/:symbol', (req, res) => {
   res.json({ stocks: trackedStocks });
 });
 
-app.post('/api/refresh', async (req, res) => {
-  res.json({ message: 'Pipeline started' });
-  runPipeline();
-});
-
 app.get('/api/status', (req, res) => {
   res.json({
     isRunning: newsStore.isRunning,
@@ -139,7 +143,6 @@ app.get('/api/status', (req, res) => {
 initDB().then(() => {
   app.listen(config.PORT, () => {
     console.log(`✅ Server running on http://localhost:${config.PORT}`);
-    console.log(`📊 Tracking stocks: ${trackedStocks.join(', ')}`);
     runPipeline();
     cron.schedule(`*/${config.REFRESH_INTERVAL} * * * *`, () => {
       console.log('[Cron] Scheduled pipeline run...');
