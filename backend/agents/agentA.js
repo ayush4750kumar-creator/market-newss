@@ -57,7 +57,7 @@ async function runAgentA(articles) {
   for (let i = 0; i < articles.length; i++) {
     const result = await analyzeArticle(articles[i]);
     results.push(result);
-    await new Promise(r => setTimeout(r, 2500)); // wait 2.5s between each
+    await new Promise(r => setTimeout(r, 4000)); // wait 2.5s between each
   }
 
   const categorized = {
