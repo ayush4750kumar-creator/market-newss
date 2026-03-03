@@ -8,11 +8,10 @@
 </head>
 <body>
 
-  <!-- Toast notification -->
   <div id="toast" class="toast"></div>
 
   <!-- Auth Page -->
-  <div id="auth-page" style="display:none; justify-content:center; align-items:center; min-height:100vh; background:#0a0a0a;">
+  <div id="auth-page" style="display:none; justify-content:center; align-items:center; min-height:100vh; background:#0d0d1a;">
     <div class="auth-box">
       <h1 class="auth-logo">MarketPulse</h1>
       <p class="auth-sub">Real-time market intelligence</p>
@@ -42,25 +41,34 @@
         <div class="logo">MarketPulse</div>
         <div class="status-bar">
           <span id="last-updated"></span>
-          <span id="user-email"></span>
           <select id="sort-select" onchange="changeSort()">
             <option value="newest">Newest</option>
             <option value="oldest">Oldest</option>
           </select>
           <button id="refresh-btn" onclick="refreshNow()">Refresh</button>
-          <button class="logout-btn" onclick="logout()">Logout</button>
+          <!-- Profile button -->
+          <div class="profile-wrap">
+            <button class="profile-btn" id="profile-btn" onclick="toggleProfile()">
+              <span id="profile-initial">U</span>
+            </button>
+            <div class="profile-dropdown" id="profile-dropdown">
+              <div class="profile-header">
+                <div class="profile-name">My Account</div>
+                <div class="profile-email" id="profile-email-display"></div>
+              </div>
+              <button class="profile-item" onclick="filterByStock('bookmarks'); closeProfile()">Saved Articles</button>
+              <button class="profile-item" onclick="showNewest()">Newest First</button>
+              <button class="profile-item danger" onclick="logout()">Logout</button>
+            </div>
+          </div>
         </div>
       </div>
 
-      <!-- Search bar -->
+      <!-- Search -->
       <div class="search-wrap">
-        <input
-          id="stock-search"
-          class="search-bar"
-          type="text"
-          placeholder="Search or add a stock symbol (e.g. NVDA, NFLX)..."
-          onkeydown="handleSearch(event)"
-        />
+        <input id="stock-search" class="search-bar" type="text"
+          placeholder="Search or add stock symbol (e.g. NVDA, NFLX)..."
+          onkeydown="handleSearch(event)" />
       </div>
 
       <!-- Stock tabs -->

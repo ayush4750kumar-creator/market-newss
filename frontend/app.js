@@ -7,6 +7,8 @@ let allNews = [];
 let trackedStocks = [];
 let token = localStorage.getItem('token');
 let currentUser = JSON.parse(localStorage.getItem('user') || 'null');
+let longPressTimer = null;
+let activeContextMenu = null;
 
 // ─── Toast ───────────────────────────────────────────────────────────────────
 
@@ -17,7 +19,7 @@ function showToast(msg, duration = 3000) {
   setTimeout(() => t.classList.remove('show'), duration);
 }
 
-// ─── Auth ───────────────────────────────────────────────────────────────────
+// ─── Auth ────────────────────────────────────────────────────────────────────
 
 function isLoggedIn() { return !!token; }
 
@@ -40,7 +42,31 @@ function authHeaders() {
   return { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` };
 }
 
-// ─── Pages ──────────────────────────────────────────────────────────────────
+// ─── Profile Menu ────────────────────────────────────────────────────────────
+
+function toggleProfile() {
+  const dd = document.getElementById('profile-dropdown');
+  dd.classList.toggle('open');
+}
+
+function closeProfile() {
+  document.getElementById('profile-dropdown').classList.remove('open');
+}
+
+function showNewest() {
+  currentSort = 'newest';
+  document.getElementById('sort-select').value = 'newest';
+  fetchNews();
+  closeProfile();
+}
+
+// Close profile dropdown when clicking outside
+document.addEventListener('click', e => {
+  const wrap = document.querySelector('.profile-wrap');
+  if (wrap && !wrap.contains(e.target)) closeProfile();
+});
+
+// ─── Pages ───────────────────────────────────────────────────────────────────
 
 function showAuthPage() {
   document.getElementById('auth-page').style.display = 'flex';
@@ -50,7 +76,9 @@ function showAuthPage() {
 function showMainPage() {
   document.getElementById('auth-page').style.display = 'none';
   document.getElementById('main-page').style.display = 'block';
-  document.getElementById('user-email').textContent = currentUser?.email || '';
+  const email = currentUser?.email || '';
+  document.getElementById('profile-initial').textContent = email.charAt(0).toUpperCase() || 'U';
+  document.getElementById('profile-email-display').textContent = email;
   loadUserPreferences();
   fetchStocks();
   fetchNews();
@@ -63,7 +91,7 @@ function switchTab(tab) {
   document.querySelector(`.auth-tab[onclick="switchTab('${tab}')"]`).classList.add('active');
 }
 
-// ─── Auth Actions ────────────────────────────────────────────────────────────
+// ─── Auth Actions ─────────────────────────────────────────────────────────────
 
 async function login() {
   const email = document.getElementById('login-email').value.trim();
@@ -80,9 +108,7 @@ async function login() {
     if (!res.ok) { err.textContent = data.error; return; }
     saveAuth(data.token, data.user);
     showMainPage();
-  } catch (e) {
-    err.textContent = 'Could not connect to server.';
-  }
+  } catch (e) { err.textContent = 'Could not connect to server.'; }
 }
 
 async function register() {
@@ -101,12 +127,10 @@ async function register() {
     if (!res.ok) { err.textContent = data.error; return; }
     saveAuth(data.token, data.user);
     showMainPage();
-  } catch (e) {
-    err.textContent = 'Could not connect to server.';
-  }
+  } catch (e) { err.textContent = 'Could not connect to server.'; }
 }
 
-// ─── Preferences ─────────────────────────────────────────────────────────────
+// ─── Preferences ──────────────────────────────────────────────────────────────
 
 function loadUserPreferences() {
   if (!currentUser?.preferences) return;
@@ -124,7 +148,7 @@ async function savePreferences() {
   });
 }
 
-// ─── News ────────────────────────────────────────────────────────────────────
+// ─── News ─────────────────────────────────────────────────────────────────────
 
 async function fetchNews() {
   try {
@@ -149,13 +173,12 @@ async function fetchNews() {
 
 async function fetchStocks() {
   try {
-    const userWatchlist = currentUser?.watchlist || [];
-    trackedStocks = userWatchlist;
+    trackedStocks = currentUser?.watchlist || [];
     renderStockTabs();
   } catch (e) {}
 }
 
-// ─── Render ──────────────────────────────────────────────────────────────────
+// ─── Render ───────────────────────────────────────────────────────────────────
 
 function renderNews() {
   const grid = document.getElementById('news-grid');
@@ -176,7 +199,8 @@ function renderNews() {
         <div class="card-meta">
           <span class="stock-badge">${item.stock || 'GLOBAL'}</span>
           <span class="time-label">${timeAgo(item.publishedAt)}</span>
-          <button class="bookmark-btn ${isBookmarked ? 'bookmarked' : ''}" onclick="toggleBookmark(event, ${JSON.stringify(item).replace(/"/g, '&quot;')})">
+          <button class="bookmark-btn ${isBookmarked ? 'bookmarked' : ''}"
+            onclick="toggleBookmark(event, ${JSON.stringify(item).replace(/"/g, '&quot;')})">
             ${isBookmarked ? 'Saved' : 'Save'}
           </button>
         </div>
@@ -185,15 +209,15 @@ function renderNews() {
         <div class="sentiment-tag ${item.sentiment}">${item.sentiment === 'bullish' ? 'Bullish' : item.sentiment === 'bearish' ? 'Bearish' : 'Neutral'}</div>
         <div class="card-source">${item.source}</div>
       </div>
-    </div>
-  `}).join('');
+    </div>`
+  }).join('');
 }
 
 function renderBookmarks() {
-  const grid = document.getElementById('news-grid');
   const bookmarks = currentUser?.bookmarks || [];
   if (bookmarks.length === 0) {
-    grid.innerHTML = '<div class="loading">No saved articles yet. Click Save on any article.</div>';
+    document.getElementById('news-grid').innerHTML =
+      '<div class="loading">No saved articles yet. Click Save on any article.</div>';
     return;
   }
   allNews = bookmarks;
@@ -202,10 +226,20 @@ function renderBookmarks() {
 
 function renderStockTabs() {
   const container = document.getElementById('stock-tabs');
+
   const stockTabsHTML = trackedStocks.map(s => `
-    <div class="tab-wrap">
-      <button class="tab ${currentStock === s ? 'active' : ''}" onclick="filterByStock('${s}')">${s}</button>
-      <button class="tab-remove" onclick="removeStock('${s}')">Remove</button>
+    <div class="tab-wrap" id="wrap-${s}">
+      <button class="tab ${currentStock === s ? 'active' : ''}"
+        onclick="filterByStock('${s}')"
+        onmousedown="startLongPress('${s}')"
+        onmouseup="cancelLongPress()"
+        onmouseleave="cancelLongPress()"
+        ontouchstart="startLongPress('${s}')"
+        ontouchend="cancelLongPress()"
+      >${s}</button>
+      <div class="tab-context-menu" id="ctx-${s}">
+        <button class="tab-context-item" onclick="removeStock('${s}')">Remove ${s}</button>
+      </div>
     </div>
   `).join('');
 
@@ -217,10 +251,42 @@ function renderStockTabs() {
   `;
 }
 
-// ─── Actions ─────────────────────────────────────────────────────────────────
+// ─── Long Press for Remove ────────────────────────────────────────────────────
+
+function startLongPress(symbol) {
+  cancelLongPress();
+  longPressTimer = setTimeout(() => {
+    closeAllContextMenus();
+    const menu = document.getElementById(`ctx-${symbol}`);
+    if (menu) {
+      menu.classList.add('open');
+      activeContextMenu = symbol;
+    }
+  }, 600); // 600ms hold
+}
+
+function cancelLongPress() {
+  if (longPressTimer) {
+    clearTimeout(longPressTimer);
+    longPressTimer = null;
+  }
+}
+
+function closeAllContextMenus() {
+  document.querySelectorAll('.tab-context-menu').forEach(m => m.classList.remove('open'));
+  activeContextMenu = null;
+}
+
+// Close context menus when clicking outside
+document.addEventListener('click', e => {
+  if (!e.target.closest('.tab-wrap')) closeAllContextMenus();
+});
+
+// ─── Actions ──────────────────────────────────────────────────────────────────
 
 function filterByStock(stock) {
   currentStock = stock;
+  closeAllContextMenus();
   fetchNews();
   renderStockTabs();
 }
@@ -252,11 +318,12 @@ async function toggleBookmark(e, article) {
     currentUser.bookmarks = data.bookmarks;
     localStorage.setItem('user', JSON.stringify(currentUser));
     renderNews();
-    showToast(article.id && currentUser.bookmarks.find(b => b.id === article.id) ? 'Article saved.' : 'Article removed.');
+    showToast(currentUser.bookmarks.find(b => b.id === article.id) ? 'Article saved.' : 'Article removed.');
   } catch (e) {}
 }
 
 async function removeStock(symbol) {
+  closeAllContextMenus();
   if (!confirm(`Remove ${symbol} from your watchlist?`)) return;
   try {
     const watchlist = (currentUser?.watchlist || []).filter(s => s !== symbol);
@@ -272,13 +339,13 @@ async function removeStock(symbol) {
     if (currentStock === symbol) currentStock = 'global';
     renderStockTabs();
     fetchNews();
-    showToast(symbol + ' removed from watchlist.');
+    showToast(`${symbol} removed from watchlist.`);
   } catch (e) {
     showToast('Could not remove stock.');
   }
 }
 
-// ─── Search + Add Stock ──────────────────────────────────────────────────────
+// ─── Search + Add ─────────────────────────────────────────────────────────────
 
 function handleSearch(e) {
   if (e.key === 'Enter') {
@@ -321,8 +388,9 @@ async function addStock(symbol) {
     trackedStocks = data.watchlist;
     currentStock = symbol;
     renderStockTabs();
-    showToast(symbol + ' added. Fetching news...');
-    document.getElementById('news-grid').innerHTML = '<div class="loading">Fetching news for ' + symbol + '...</div>';
+    showToast(`${symbol} added. Fetching news...`);
+    document.getElementById('news-grid').innerHTML =
+      `<div class="loading">Fetching news for ${symbol}...</div>`;
 
     let attempts = 0;
     const poll = setInterval(async () => {
@@ -330,16 +398,15 @@ async function addStock(symbol) {
       await fetchNews();
       if (attempts > 12) {
         clearInterval(poll);
-        showToast('Done fetching news for ' + symbol);
+        showToast(`Done fetching news for ${symbol}`);
       }
     }, 5000);
-
   } catch (e) {
     showToast('Could not add stock. Try again.');
   }
 }
 
-// ─── Refresh ─────────────────────────────────────────────────────────────────
+// ─── Refresh ──────────────────────────────────────────────────────────────────
 
 async function refreshNow() {
   document.getElementById('refresh-btn').textContent = 'Loading...';
@@ -347,7 +414,7 @@ async function refreshNow() {
   document.getElementById('refresh-btn').textContent = 'Refresh';
 }
 
-// ─── Utils ───────────────────────────────────────────────────────────────────
+// ─── Utils ────────────────────────────────────────────────────────────────────
 
 function timeAgo(dateStr) {
   if (!dateStr) return '';
@@ -358,7 +425,7 @@ function timeAgo(dateStr) {
   return `${Math.floor(diff / 86400)}d ago`;
 }
 
-// ─── Init ────────────────────────────────────────────────────────────────────
+// ─── Init ─────────────────────────────────────────────────────────────────────
 
 if (isLoggedIn()) {
   showMainPage();
