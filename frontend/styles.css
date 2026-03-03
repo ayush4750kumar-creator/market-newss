@@ -239,3 +239,23 @@ header {
   .auth-box { margin: 16px; padding: 24px; }
   #sort-select { font-size: 11px; }
 }
+
+
+/* ── Stock tab with remove button ── */
+.tab-wrap {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.tab-remove {
+  background: none;
+  border: none;
+  color: #ff6b6b;
+  cursor: pointer;
+  font-size: 10px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.tab-wrap:hover .tab-remove { opacity: 1; }

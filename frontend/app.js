@@ -194,9 +194,12 @@ function renderBookmarks() {
 
 function renderStockTabs() {
   const container = document.getElementById('stock-tabs');
-  const stockTabsHTML = trackedStocks.map(s =>
-    `<button class="tab ${currentStock === s ? 'active' : ''}" onclick="filterByStock('${s}')">${s}</button>`
-  ).join('');
+  const stockTabsHTML = trackedStocks.map(s => `
+    <div class="tab-wrap">
+      <button class="tab ${currentStock === s ? 'active' : ''}" onclick="filterByStock('${s}')">${s}</button>
+      <button class="tab-remove" onclick="removeStock('${s}')" title="Remove">✕</button>
+    </div>
+  `).join('');
 
   container.innerHTML = `
     <button class="tab ${currentStock === 'global' ? 'active' : ''}" onclick="filterByStock('global')">🌍 Global</button>
@@ -243,6 +246,27 @@ async function toggleBookmark(e, article) {
     localStorage.setItem('user', JSON.stringify(currentUser));
     renderNews();
   } catch (e) {}
+}
+
+async function removeStock(symbol) {
+  if (!confirm(`Remove ${symbol} from your watchlist?`)) return;
+  try {
+    const watchlist = (currentUser?.watchlist || []).filter(s => s !== symbol);
+    const res = await fetch(`${API_BASE}/api/auth/watchlist`, {
+      method: 'PUT',
+      headers: authHeaders(),
+      body: JSON.stringify({ watchlist })
+    });
+    const data = await res.json();
+    currentUser.watchlist = data.watchlist;
+    localStorage.setItem('user', JSON.stringify(currentUser));
+    trackedStocks = data.watchlist;
+    if (currentStock === symbol) currentStock = 'global';
+    renderStockTabs();
+    fetchNews();
+  } catch (e) {
+    alert('Could not remove stock.');
+  }
 }
 
 function showAddStock() {
