@@ -257,6 +257,7 @@ async function toggleBookmark(e, article) {
 }
 
 async function removeStock(symbol) {
+  if (!confirm(`Remove ${symbol} from your watchlist?`)) return;
   try {
     const watchlist = (currentUser?.watchlist || []).filter(s => s !== symbol);
     const res = await fetch(`${API_BASE}/api/auth/watchlist`, {
