@@ -3,6 +3,7 @@ const API_BASE = 'https://market-newss-production.up.railway.app';
 let currentStock = 'global';
 let currentSentiment = 'all';
 let currentSort = 'newest';
+let searchKeyword = '';
 let allNews = [];
 let trackedStocks = [];
 let token = localStorage.getItem('token');
@@ -107,45 +108,44 @@ function toggleSearch() {
 }
 
 function showSuggestions() {
-  const val = document.getElementById('stock-search').value.trim().toUpperCase();
+  const val = document.getElementById('stock-search').value.trim();
   const container = document.getElementById('suggestions');
-
   if (!val) { container.innerHTML = ''; return; }
 
+  const valUpper = val.toUpperCase();
   const matches = STOCK_SUGGESTIONS.filter(s =>
-    s.symbol.startsWith(val) || s.name.toUpperCase().includes(val)
-  ).slice(0, 5);
+    s.symbol.startsWith(valUpper) || s.name.toUpperCase().includes(valUpper)
+  ).slice(0, 4);
 
-  if (matches.length === 0) {
-    container.innerHTML = `<div class="suggestion-item" onclick="selectSuggestion('${val}')">Search "${val}" <span>View news</span></div>`;
-    return;
-  }
-
-  container.innerHTML = matches.map(s => `
-    <div class="suggestion-item" onclick="selectSuggestion('${s.symbol}')">
+  // Always show keyword search as first option
+  const keywordOption = `<div class="suggestion-item" onclick="applyKeywordSearch('${val}')">🔍 Search "${val}" in all news <span>keyword</span></div>`;
+  const stockOptions = matches.map(s => `
+    <div class="suggestion-item" onclick="applyKeywordSearch('${s.symbol}')">
       ${s.symbol} <span>${s.name}</span>
     </div>
   `).join('');
+
+  container.innerHTML = keywordOption + stockOptions;
 }
 
-function selectSuggestion(symbol) {
+function applyKeywordSearch(keyword) {
   document.getElementById('stock-search').value = '';
   document.getElementById('suggestions').innerHTML = '';
   document.getElementById('search-wrap').style.display = 'none';
-  // Search only filters news — does NOT add to watchlist
-  filterByStock(symbol);
-  showToast('Showing news for ' + symbol);
+  searchKeyword = keyword.toLowerCase();
+  renderNews();
+  showToast('Searching: ' + keyword);
+}
+
+function selectSuggestion(symbol) {
+  applyKeywordSearch(symbol);
 }
 
 function handleSearch(e) {
   if (e.key === 'Enter') {
-    const val = document.getElementById('stock-search').value.trim().toUpperCase();
+    const val = document.getElementById('stock-search').value.trim();
     if (!val) return;
-    document.getElementById('stock-search').value = '';
-    document.getElementById('suggestions').innerHTML = '';
-    document.getElementById('search-wrap').style.display = 'none';
-    filterByStock(val);
-    showToast('Showing news for ' + val);
+    applyKeywordSearch(val);
   }
 }
 
@@ -258,8 +258,16 @@ function renderNews() {
   const grid = document.getElementById('news-grid');
   let news = allNews;
   if (currentSentiment !== 'all') news = news.filter(n => n.sentiment === currentSentiment);
+  if (searchKeyword) {
+    news = news.filter(n =>
+      (n.headline || '').toLowerCase().includes(searchKeyword) ||
+      (n.story || '').toLowerCase().includes(searchKeyword) ||
+      (n.stock || '').toLowerCase().includes(searchKeyword) ||
+      (n.source || '').toLowerCase().includes(searchKeyword)
+    );
+  }
   if (news.length === 0) {
-    grid.innerHTML = '<div class="loading">No news available yet.</div>';
+    grid.innerHTML = `<div class="loading">${searchKeyword ? `No results for "${searchKeyword}"` : 'No news available yet.'}</div>`;
     return;
   }
   const bookmarks = currentUser?.bookmarks || [];
@@ -367,6 +375,7 @@ function closeAllContextMenus() {
 
 function filterByStock(stock) {
   currentStock = stock;
+  searchKeyword = '';   // clear any keyword search when switching tabs
   closeAllContextMenus();
   fetchNews();
   renderStockTabs();
