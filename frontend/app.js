@@ -158,6 +158,19 @@ function handleSearch(e) {
   }
 }
 
+// ── About Page ────────────────────────────────────────────────────────────
+
+function showAboutPage() {
+  document.getElementById('main-page').style.display = 'none';
+  document.getElementById('about-page').style.display = 'block';
+  window.scrollTo(0, 0);
+}
+
+function hideAboutPage() {
+  document.getElementById('about-page').style.display = 'none';
+  document.getElementById('main-page').style.display = 'block';
+}
+
 // ── Pages ─────────────────────────────────────────────────────────────────
 
 function showAuthPage() {
