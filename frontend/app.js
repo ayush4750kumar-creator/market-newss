@@ -128,13 +128,22 @@ function showSuggestions() {
   container.innerHTML = keywordOption + stockOptions;
 }
 
+let searchDebounceTimer = null;
+
 function applyKeywordSearch(keyword) {
   document.getElementById('stock-search').value = '';
   document.getElementById('suggestions').innerHTML = '';
   document.getElementById('search-wrap').style.display = 'none';
-  searchKeyword = keyword.toLowerCase();
-  renderNews();
-  showToast('Searching: ' + keyword);
+
+  // Show loading state immediately
+  document.getElementById('news-grid').innerHTML = `<div class="loading">Searching for "${keyword}"...</div>`;
+
+  // Delay then filter
+  if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
+  searchDebounceTimer = setTimeout(() => {
+    searchKeyword = keyword.toLowerCase();
+    renderNews();
+  }, 1200);
 }
 
 function selectSuggestion(symbol) {
@@ -327,34 +336,35 @@ function renderStockTabs() {
   `;
 }
 
-// ── Long Press — position menu using fixed coords so it pops above sentiment bar ──
+// ── Long Press — works on both mobile touch and desktop mouse ──
 
 function startLongPress(e, symbol) {
+  // prevent touch from firing click immediately
+  if (e.type === 'touchstart') e.preventDefault();
   cancelLongPress();
-  // Capture button position before timeout
   const btn = e.currentTarget || e.target;
   longPressTimer = setTimeout(() => {
     closeAllContextMenus();
     const menu = document.getElementById(`ctx-${symbol}`);
     if (!menu) return;
 
-    // Temporarily show off-screen to measure width
     menu.style.visibility = 'hidden';
     menu.style.display = 'block';
     const menuW = menu.offsetWidth;
     menu.style.display = '';
     menu.style.visibility = '';
 
-    // Get button bounding rect for fixed positioning
     const rect = btn.getBoundingClientRect();
-    const top = rect.top - 8;            // just above the button
+    const top = rect.top - 8;
     const left = rect.left + rect.width / 2 - menuW / 2;
 
     menu.style.top = `${top}px`;
     menu.style.left = `${Math.max(8, left)}px`;
     menu.style.transform = 'translateY(-100%)';
-
     menu.classList.add('open');
+
+    // vibrate on mobile for feedback
+    if (navigator.vibrate) navigator.vibrate(50);
   }, 600);
 }
 

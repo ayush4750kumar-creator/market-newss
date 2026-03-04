@@ -7,6 +7,16 @@
   user-select: text;
 }
 
+/* ── Prevent iOS zoom on input focus ── */
+input, select, textarea {
+  font-size: 16px !important;
+}
+
+/* ── Prevent accidental zoom on double-tap ── */
+header, .stock-tabs, .sentiment-filters {
+  touch-action: pan-x pan-y;
+}
+
 html, body {
   font-family: 'Inter', system-ui, sans-serif;
   background: #000000;

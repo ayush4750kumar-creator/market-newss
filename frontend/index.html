@@ -2,7 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
   <title>MarketPulse</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
@@ -57,9 +59,8 @@
                 <div class="profile-email" id="profile-email-display"></div>
               </div>
               <button class="profile-item" onclick="filterByStock('bookmarks'); closeProfile()">Saved Articles</button>
-              <button class="profile-item" onclick="showNewest()">Newest First</button>
               <select class="profile-sort" id="sort-select" onchange="changeSort()">
-                <option value="newest">Newest First</option>
+                <option value="newest">Newest</option>
                 <option value="oldest">Oldest First</option>
               </select>
               <button class="profile-item" onclick="refreshNow(); closeProfile()">Refresh Feed</button>
