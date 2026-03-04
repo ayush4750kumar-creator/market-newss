@@ -95,11 +95,16 @@ document.addEventListener('click', e => {
 
 // ── Search toggle ─────────────────────────────────────────────────────────
 
-function toggleSearch() {
+function toggleSearch(mode = 'search') {
   const wrap = document.getElementById('search-wrap');
   const isOpen = wrap.style.display !== 'none';
   wrap.style.display = isOpen ? 'none' : 'block';
+  wrap.dataset.mode = mode;
   if (!isOpen) {
+    const placeholder = mode === 'add'
+      ? 'Add stock to watchlist (e.g. AAPL, TSLA...)'
+      : 'Search news by keyword (e.g. Iran, Apple...)';
+    document.getElementById('stock-search').placeholder = placeholder;
     setTimeout(() => document.getElementById('stock-search').focus(), 100);
   } else {
     document.getElementById('suggestions').innerHTML = '';
@@ -113,19 +118,31 @@ function showSuggestions() {
   if (!val) { container.innerHTML = ''; return; }
 
   const valUpper = val.toUpperCase();
+  const isAddMode = document.getElementById('search-wrap').dataset.mode === 'add';
+
   const matches = STOCK_SUGGESTIONS.filter(s =>
     s.symbol.startsWith(valUpper) || s.name.toUpperCase().includes(valUpper)
   ).slice(0, 4);
 
-  // Always show keyword search as first option
-  const keywordOption = `<div class="suggestion-item" onclick="applyKeywordSearch('${val}')">🔍 Search "${val}" in all news <span>keyword</span></div>`;
-  const stockOptions = matches.map(s => `
-    <div class="suggestion-item" onclick="applyKeywordSearch('${s.symbol}')">
-      ${s.symbol} <span>${s.name}</span>
-    </div>
-  `).join('');
-
-  container.innerHTML = keywordOption + stockOptions;
+  if (isAddMode) {
+    // Add mode — show add to watchlist options
+    const addNew = `<div class="suggestion-item" onclick="addStock('${valUpper}')">➕ Add "${valUpper}" to watchlist <span>new</span></div>`;
+    const stockOptions = matches.map(s => `
+      <div class="suggestion-item" onclick="addStock('${s.symbol}')">
+        ${s.symbol} <span>${s.name}</span>
+      </div>
+    `).join('');
+    container.innerHTML = addNew + stockOptions;
+  } else {
+    // Search mode — keyword search
+    const keywordOption = `<div class="suggestion-item" onclick="applyKeywordSearch('${val}')">🔍 Search "${val}" in all news <span>keyword</span></div>`;
+    const stockOptions = matches.map(s => `
+      <div class="suggestion-item" onclick="applyKeywordSearch('${s.symbol}')">
+        ${s.symbol} <span>${s.name} news</span>
+      </div>
+    `).join('');
+    container.innerHTML = keywordOption + stockOptions;
+  }
 }
 
 let searchDebounceTimer = null;
@@ -344,7 +361,7 @@ function renderStockTabs() {
     <button class="tab ${currentStock === 'all' ? 'active' : ''}" onclick="filterByStock('all')">All</button>
     <button class="tab ${currentStock === 'bookmarks' ? 'active' : ''}" onclick="filterByStock('bookmarks')">Saved</button>
     ${stockTabsHTML}
-    <button class="tab-add" onclick="toggleSearch()">+ Add</button>
+    <button class="tab-add" onclick="toggleSearch('add')">+ Add</button>
   `;
 
   // Attach touch long press AFTER rendering, without preventDefault so clicks still work
