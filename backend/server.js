@@ -6,7 +6,7 @@ const { runAgentO } = require('./agents/agentO');
 const { runAgentP } = require('./agents/agentP');
 const { runAgentA } = require('./agents/agentA');
 const { runAgentB } = require('./agents/agentB');
-const { initDB, pool } = require('./services/database');
+const { initDB, pool, saveNews, loadNews } = require('./services/database');
 const { router: authRouter, authenticate } = require('./routes/auth');
 
 const app = express();
@@ -24,16 +24,39 @@ let newsStore = {
 
 let trackedStocks = [...config.DEFAULT_STOCKS];
 
-// ✅ Load all user watchlist stocks from DB so pipeline tracks them
+// ✅ Load all user watchlist stocks from DB
 async function loadAllUserStocks() {
   try {
     const result = await pool.query('SELECT DISTINCT UNNEST(watchlist) as symbol FROM users');
     const userSymbols = result.rows.map(r => r.symbol.toUpperCase());
-    const merged = [...new Set([...trackedStocks, ...userSymbols])];
-    trackedStocks = merged;
-    console.log(`[Pipeline] Tracking ${trackedStocks.length} stocks: ${trackedStocks.join(', ')}`);
+    trackedStocks = [...new Set([...config.DEFAULT_STOCKS, ...userSymbols])];
+    console.log(`[Pipeline] Tracking ${trackedStocks.length} stocks`);
   } catch (err) {
     console.error('[Pipeline] Could not load user stocks:', err.message);
+  }
+}
+
+// ✅ Load saved news from DB into memory on startup
+async function loadNewsFromDB() {
+  try {
+    const articles = await loadNews();
+    if (articles.length === 0) return;
+
+    newsStore.all = articles;
+    newsStore.lastUpdated = articles[0]?.publishedAt || new Date().toISOString();
+
+    articles.forEach(item => {
+      if (item.stock) {
+        if (!newsStore.byStock[item.stock]) newsStore.byStock[item.stock] = [];
+        newsStore.byStock[item.stock].push(item);
+      } else {
+        newsStore.global.push(item);
+      }
+    });
+
+    console.log(`[DB] Loaded ${articles.length} articles from database`);
+  } catch (err) {
+    console.error('[DB] Error loading news:', err.message);
   }
 }
 
@@ -60,6 +83,9 @@ async function runPipeline() {
     const categorized = await runAgentA(allRawArticles);
     const published = await runAgentB(categorized);
 
+    // ✅ Save to DB so news survives restarts
+    await saveNews(published);
+
     newsStore.all = [...published, ...newsStore.all].slice(0, 200);
 
     published.forEach(item => {
@@ -80,7 +106,7 @@ async function runPipeline() {
   }
 }
 
-// ✅ Mini pipeline - only fetches news for one specific stock
+// ✅ Mini pipeline for single stock
 async function runMiniPipeline(symbol) {
   console.log(`[Mini Pipeline] Fetching news for ${symbol}...`);
   try {
@@ -97,6 +123,9 @@ async function runMiniPipeline(symbol) {
 
     const categorized = await runAgentA(newArticles);
     const published = await runAgentB(categorized);
+
+    // ✅ Save to DB
+    await saveNews(published);
 
     newsStore.all = [...published, ...newsStore.all].slice(0, 200);
     if (!newsStore.byStock[symbol]) newsStore.byStock[symbol] = [];
@@ -157,7 +186,7 @@ app.delete('/api/stocks/:symbol', (req, res) => {
   res.json({ stocks: trackedStocks });
 });
 
-// ✅ Mini pipeline route - triggered when user adds a new stock
+// ✅ Mini pipeline route
 app.post('/api/stocks/fetch', async (req, res) => {
   const { symbol } = req.body;
   if (!symbol) return res.status(400).json({ error: 'Symbol required' });
@@ -175,7 +204,10 @@ app.get('/api/status', (req, res) => {
   });
 });
 
-initDB().then(() => {
+initDB().then(async () => {
+  // ✅ Load existing news from DB before starting
+  await loadNewsFromDB();
+
   app.listen(config.PORT, () => {
     console.log(`✅ Server running on http://localhost:${config.PORT}`);
     runPipeline();
