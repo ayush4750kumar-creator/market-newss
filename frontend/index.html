@@ -59,6 +59,7 @@
                 <div class="profile-email" id="profile-email-display"></div>
               </div>
               <button class="profile-item" onclick="filterByStock('bookmarks'); closeProfile()">Saved Articles</button>
+              <button class="profile-item" onclick="showAboutPage(); closeProfile()">About</button>
               <select class="profile-sort" id="sort-select" onchange="changeSort()">
                 <option value="newest">Newest</option>
                 <option value="oldest">Oldest First</option>
@@ -102,6 +103,72 @@
     <main id="news-grid" class="news-grid">
       <div class="loading">Loading market news...</div>
     </main>
+  </div>
+
+  <!-- About Page -->
+  <div id="about-page" style="display:none">
+    <div class="about-header">
+      <button class="about-back" onclick="hideAboutPage()">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <polyline points="15 18 9 12 15 6"/>
+        </svg>
+        Back
+      </button>
+      <div class="about-header-title">About</div>
+    </div>
+
+    <div class="about-body">
+
+      <div class="about-hero">
+        <div class="about-logo-mark">BB</div>
+        <h1 class="about-company">BlueBlack Corporation</h1>
+        <p class="about-tagline">Bengaluru, India</p>
+      </div>
+
+      <div class="about-section">
+        <h2 class="about-section-title">About</h2>
+        <p class="about-section-text">MarketPulse is a product of BlueBlack Corporation.</p>
+      </div>
+
+      <div class="about-section">
+        <h2 class="about-section-title">Founders</h2>
+        <div class="about-founders">
+          <div class="about-founder-card">
+            <div class="founder-avatar">A</div>
+            <div class="founder-info">
+              <div class="founder-name">Ayush</div>
+              <div class="founder-role">Co-Founder</div>
+            </div>
+          </div>
+          <div class="about-founder-card">
+            <div class="founder-avatar">S</div>
+            <div class="founder-info">
+              <div class="founder-name">Sanskar</div>
+              <div class="founder-role">Co-Founder</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="about-section">
+        <h2 class="about-section-title">Contact</h2>
+        <div class="about-contact-card">
+          <div class="about-contact-row">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1a56db" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+            <span>Kumaraswamy Layout, Bengaluru, Karnataka, India</span>
+          </div>
+          <div class="about-contact-row">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1a56db" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><polyline points="2,4 12,13 22,4"/></svg>
+            <span>hello@blueblackcorp.com</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="about-footer">
+        <p>© 2025 BlueBlack Corporation</p>
+      </div>
+
+    </div>
   </div>
 
   <script src="app.js"></script>
