@@ -8,9 +8,40 @@ let trackedStocks = [];
 let token = localStorage.getItem('token');
 let currentUser = JSON.parse(localStorage.getItem('user') || 'null');
 let longPressTimer = null;
-let activeContextMenu = null;
 
-// ─── Toast ───────────────────────────────────────────────────────────────────
+// ── Popular stock suggestions ──────────────────────────────────────────────
+const STOCK_SUGGESTIONS = [
+  { symbol: 'AAPL', name: 'Apple' },
+  { symbol: 'TSLA', name: 'Tesla' },
+  { symbol: 'GOOGL', name: 'Google' },
+  { symbol: 'MSFT', name: 'Microsoft' },
+  { symbol: 'AMZN', name: 'Amazon' },
+  { symbol: 'META', name: 'Meta' },
+  { symbol: 'NVDA', name: 'Nvidia' },
+  { symbol: 'NFLX', name: 'Netflix' },
+  { symbol: 'AMD', name: 'AMD' },
+  { symbol: 'INTC', name: 'Intel' },
+  { symbol: 'TCS', name: 'TCS' },
+  { symbol: 'RELIANCE', name: 'Reliance' },
+  { symbol: 'INFY', name: 'Infosys' },
+  { symbol: 'HDFCBANK', name: 'HDFC Bank' },
+  { symbol: 'LLY', name: 'Eli Lilly' },
+  { symbol: 'JPM', name: 'JPMorgan' },
+  { symbol: 'BAC', name: 'Bank of America' },
+  { symbol: 'UBER', name: 'Uber' },
+  { symbol: 'SPOT', name: 'Spotify' },
+  { symbol: 'PYPL', name: 'PayPal' },
+  { symbol: 'CRM', name: 'Salesforce' },
+  { symbol: 'SHOP', name: 'Shopify' },
+  { symbol: 'SNAP', name: 'Snapchat' },
+  { symbol: 'TWTR', name: 'Twitter/X' },
+  { symbol: 'DIS', name: 'Disney' },
+  { symbol: 'WMT', name: 'Walmart' },
+  { symbol: 'V', name: 'Visa' },
+  { symbol: 'MA', name: 'Mastercard' },
+];
+
+// ── Toast ─────────────────────────────────────────────────────────────────
 
 function showToast(msg, duration = 3000) {
   const t = document.getElementById('toast');
@@ -19,20 +50,18 @@ function showToast(msg, duration = 3000) {
   setTimeout(() => t.classList.remove('show'), duration);
 }
 
-// ─── Auth ────────────────────────────────────────────────────────────────────
+// ── Auth ──────────────────────────────────────────────────────────────────
 
 function isLoggedIn() { return !!token; }
 
 function saveAuth(t, u) {
-  token = t;
-  currentUser = u;
+  token = t; currentUser = u;
   localStorage.setItem('token', t);
   localStorage.setItem('user', JSON.stringify(u));
 }
 
 function logout() {
-  token = null;
-  currentUser = null;
+  token = null; currentUser = null;
   localStorage.removeItem('token');
   localStorage.removeItem('user');
   showAuthPage();
@@ -42,31 +71,84 @@ function authHeaders() {
   return { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` };
 }
 
-// ─── Profile Menu ────────────────────────────────────────────────────────────
+// ── Profile ───────────────────────────────────────────────────────────────
 
 function toggleProfile() {
-  const dd = document.getElementById('profile-dropdown');
-  dd.classList.toggle('open');
+  document.getElementById('profile-dropdown').classList.toggle('open');
 }
-
 function closeProfile() {
   document.getElementById('profile-dropdown').classList.remove('open');
 }
-
 function showNewest() {
   currentSort = 'newest';
   document.getElementById('sort-select').value = 'newest';
-  fetchNews();
-  closeProfile();
+  fetchNews(); closeProfile();
 }
-
-// Close profile dropdown when clicking outside
 document.addEventListener('click', e => {
-  const wrap = document.querySelector('.profile-wrap');
-  if (wrap && !wrap.contains(e.target)) closeProfile();
+  if (!e.target.closest('.profile-wrap')) closeProfile();
+  if (!e.target.closest('.tab-wrap')) closeAllContextMenus();
+  if (!e.target.closest('.search-wrap') && !e.target.closest('#search-toggle')) {
+    // don't close on outside click if typing
+  }
 });
 
-// ─── Pages ───────────────────────────────────────────────────────────────────
+// ── Search toggle ─────────────────────────────────────────────────────────
+
+function toggleSearch() {
+  const wrap = document.getElementById('search-wrap');
+  const isOpen = wrap.style.display !== 'none';
+  wrap.style.display = isOpen ? 'none' : 'block';
+  if (!isOpen) {
+    setTimeout(() => document.getElementById('stock-search').focus(), 100);
+  } else {
+    document.getElementById('suggestions').innerHTML = '';
+    document.getElementById('stock-search').value = '';
+  }
+}
+
+function showSuggestions() {
+  const val = document.getElementById('stock-search').value.trim().toUpperCase();
+  const container = document.getElementById('suggestions');
+
+  if (!val) { container.innerHTML = ''; return; }
+
+  const matches = STOCK_SUGGESTIONS.filter(s =>
+    s.symbol.startsWith(val) || s.name.toUpperCase().includes(val)
+  ).slice(0, 5);
+
+  if (matches.length === 0) {
+    container.innerHTML = `<div class="suggestion-item" onclick="addStock('${val}')">Add "${val}" <span>New stock</span></div>`;
+    return;
+  }
+
+  container.innerHTML = matches.map(s => `
+    <div class="suggestion-item" onclick="selectSuggestion('${s.symbol}')">
+      ${s.symbol} <span>${s.name}</span>
+    </div>
+  `).join('');
+}
+
+function selectSuggestion(symbol) {
+  document.getElementById('stock-search').value = '';
+  document.getElementById('suggestions').innerHTML = '';
+  document.getElementById('search-wrap').style.display = 'none';
+  if (trackedStocks.includes(symbol)) {
+    filterByStock(symbol);
+    showToast('Switched to ' + symbol);
+  } else {
+    addStock(symbol);
+  }
+}
+
+function handleSearch(e) {
+  if (e.key === 'Enter') {
+    const val = document.getElementById('stock-search').value.trim().toUpperCase();
+    if (!val) return;
+    selectSuggestion(val);
+  }
+}
+
+// ── Pages ─────────────────────────────────────────────────────────────────
 
 function showAuthPage() {
   document.getElementById('auth-page').style.display = 'flex';
@@ -91,7 +173,7 @@ function switchTab(tab) {
   document.querySelector(`.auth-tab[onclick="switchTab('${tab}')"]`).classList.add('active');
 }
 
-// ─── Auth Actions ─────────────────────────────────────────────────────────────
+// ── Auth Actions ──────────────────────────────────────────────────────────
 
 async function login() {
   const email = document.getElementById('login-email').value.trim();
@@ -100,8 +182,7 @@ async function login() {
   err.textContent = '';
   try {
     const res = await fetch(`${API_BASE}/api/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password })
     });
     const data = await res.json();
@@ -119,8 +200,7 @@ async function register() {
   if (password.length < 6) { err.textContent = 'Password must be at least 6 characters.'; return; }
   try {
     const res = await fetch(`${API_BASE}/api/auth/register`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password })
     });
     const data = await res.json();
@@ -130,25 +210,25 @@ async function register() {
   } catch (e) { err.textContent = 'Could not connect to server.'; }
 }
 
-// ─── Preferences ──────────────────────────────────────────────────────────────
+// ── Preferences ───────────────────────────────────────────────────────────
 
 function loadUserPreferences() {
   if (!currentUser?.preferences) return;
   currentSentiment = currentUser.preferences.sentiment || 'all';
   currentSort = currentUser.preferences.sort || 'newest';
-  document.getElementById('sort-select').value = currentSort;
+  const sel = document.getElementById('sort-select');
+  if (sel) sel.value = currentSort;
 }
 
 async function savePreferences() {
   if (!isLoggedIn()) return;
   await fetch(`${API_BASE}/api/auth/preferences`, {
-    method: 'PUT',
-    headers: authHeaders(),
+    method: 'PUT', headers: authHeaders(),
     body: JSON.stringify({ preferences: { sentiment: currentSentiment, sort: currentSort } })
   });
 }
 
-// ─── News ─────────────────────────────────────────────────────────────────────
+// ── News ──────────────────────────────────────────────────────────────────
 
 async function fetchNews() {
   try {
@@ -160,36 +240,27 @@ async function fetchNews() {
     const res = await fetch(url, { headers: authHeaders() });
     const data = await res.json();
     allNews = data.news || [];
-
-    document.getElementById('last-updated').textContent =
-      data.lastUpdated ? `Updated: ${timeAgo(data.lastUpdated)}` : 'Not yet updated';
-
     renderNews();
   } catch (err) {
-    document.getElementById('news-grid').innerHTML =
-      '<div class="loading">Could not connect to server.</div>';
+    document.getElementById('news-grid').innerHTML = '<div class="loading">Could not connect to server.</div>';
   }
 }
 
 async function fetchStocks() {
-  try {
-    trackedStocks = currentUser?.watchlist || [];
-    renderStockTabs();
-  } catch (e) {}
+  trackedStocks = currentUser?.watchlist || [];
+  renderStockTabs();
 }
 
-// ─── Render ───────────────────────────────────────────────────────────────────
+// ── Render ────────────────────────────────────────────────────────────────
 
 function renderNews() {
   const grid = document.getElementById('news-grid');
   let news = allNews;
   if (currentSentiment !== 'all') news = news.filter(n => n.sentiment === currentSentiment);
-
   if (news.length === 0) {
-    grid.innerHTML = '<div class="loading">No news available yet. Pipeline is running...</div>';
+    grid.innerHTML = '<div class="loading">No news available yet.</div>';
     return;
   }
-
   const bookmarks = currentUser?.bookmarks || [];
   grid.innerHTML = news.map(item => {
     const isBookmarked = bookmarks.find(b => b.id === item.id);
@@ -209,15 +280,14 @@ function renderNews() {
         <div class="sentiment-tag ${item.sentiment}">${item.sentiment === 'bullish' ? 'Bullish' : item.sentiment === 'bearish' ? 'Bearish' : 'Neutral'}</div>
         <div class="card-source">${item.source}</div>
       </div>
-    </div>`
+    </div>`;
   }).join('');
 }
 
 function renderBookmarks() {
   const bookmarks = currentUser?.bookmarks || [];
   if (bookmarks.length === 0) {
-    document.getElementById('news-grid').innerHTML =
-      '<div class="loading">No saved articles yet. Click Save on any article.</div>';
+    document.getElementById('news-grid').innerHTML = '<div class="loading">No saved articles yet.</div>';
     return;
   }
   allNews = bookmarks;
@@ -226,16 +296,12 @@ function renderBookmarks() {
 
 function renderStockTabs() {
   const container = document.getElementById('stock-tabs');
-
   const stockTabsHTML = trackedStocks.map(s => `
     <div class="tab-wrap" id="wrap-${s}">
       <button class="tab ${currentStock === s ? 'active' : ''}"
         onclick="filterByStock('${s}')"
-        onmousedown="startLongPress('${s}')"
-        onmouseup="cancelLongPress()"
-        onmouseleave="cancelLongPress()"
-        ontouchstart="startLongPress('${s}')"
-        ontouchend="cancelLongPress()"
+        onmousedown="startLongPress('${s}')" onmouseup="cancelLongPress()" onmouseleave="cancelLongPress()"
+        ontouchstart="startLongPress('${s}')" ontouchend="cancelLongPress()"
       >${s}</button>
       <div class="tab-context-menu" id="ctx-${s}">
         <button class="tab-context-item" onclick="removeStock('${s}')">Remove ${s}</button>
@@ -248,41 +314,30 @@ function renderStockTabs() {
     <button class="tab ${currentStock === 'all' ? 'active' : ''}" onclick="filterByStock('all')">All</button>
     <button class="tab ${currentStock === 'bookmarks' ? 'active' : ''}" onclick="filterByStock('bookmarks')">Saved</button>
     ${stockTabsHTML}
+    <button class="tab-add" onclick="toggleSearch()">+ Add</button>
   `;
 }
 
-// ─── Long Press for Remove ────────────────────────────────────────────────────
+// ── Long Press ────────────────────────────────────────────────────────────
 
 function startLongPress(symbol) {
   cancelLongPress();
   longPressTimer = setTimeout(() => {
     closeAllContextMenus();
     const menu = document.getElementById(`ctx-${symbol}`);
-    if (menu) {
-      menu.classList.add('open');
-      activeContextMenu = symbol;
-    }
-  }, 600); // 600ms hold
+    if (menu) menu.classList.add('open');
+  }, 600);
 }
 
 function cancelLongPress() {
-  if (longPressTimer) {
-    clearTimeout(longPressTimer);
-    longPressTimer = null;
-  }
+  if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
 }
 
 function closeAllContextMenus() {
   document.querySelectorAll('.tab-context-menu').forEach(m => m.classList.remove('open'));
-  activeContextMenu = null;
 }
 
-// Close context menus when clicking outside
-document.addEventListener('click', e => {
-  if (!e.target.closest('.tab-wrap')) closeAllContextMenus();
-});
-
-// ─── Actions ──────────────────────────────────────────────────────────────────
+// ── Actions ───────────────────────────────────────────────────────────────
 
 function filterByStock(stock) {
   currentStock = stock;
@@ -292,9 +347,9 @@ function filterByStock(stock) {
 }
 
 function filterBySentiment(sentiment) {
-  currentSentiment = sentiment;
+  currentSentiment = sentiment === currentSentiment ? 'all' : sentiment;
   document.querySelectorAll('.sentiment-btn').forEach(btn => btn.classList.remove('active'));
-  event.target.classList.add('active');
+  if (currentSentiment !== 'all') event.target.classList.add('active');
   renderNews();
   savePreferences();
 }
@@ -310,8 +365,7 @@ async function toggleBookmark(e, article) {
   if (!isLoggedIn()) return;
   try {
     const res = await fetch(`${API_BASE}/api/auth/bookmarks`, {
-      method: 'POST',
-      headers: authHeaders(),
+      method: 'POST', headers: authHeaders(),
       body: JSON.stringify({ article })
     });
     const data = await res.json();
@@ -328,8 +382,7 @@ async function removeStock(symbol) {
   try {
     const watchlist = (currentUser?.watchlist || []).filter(s => s !== symbol);
     const res = await fetch(`${API_BASE}/api/auth/watchlist`, {
-      method: 'PUT',
-      headers: authHeaders(),
+      method: 'PUT', headers: authHeaders(),
       body: JSON.stringify({ watchlist })
     });
     const data = await res.json();
@@ -339,34 +392,15 @@ async function removeStock(symbol) {
     if (currentStock === symbol) currentStock = 'global';
     renderStockTabs();
     fetchNews();
-    showToast(`${symbol} removed from watchlist.`);
-  } catch (e) {
-    showToast('Could not remove stock.');
-  }
-}
-
-// ─── Search + Add ─────────────────────────────────────────────────────────────
-
-function handleSearch(e) {
-  if (e.key === 'Enter') {
-    const val = document.getElementById('stock-search').value.trim().toUpperCase();
-    if (!val) return;
-    document.getElementById('stock-search').value = '';
-    if (trackedStocks.includes(val)) {
-      filterByStock(val);
-      showToast('Switched to ' + val);
-    } else {
-      addStock(val);
-    }
-  }
+    showToast(`${symbol} removed.`);
+  } catch (e) { showToast('Could not remove stock.'); }
 }
 
 async function addStock(symbol) {
   try {
     const watchlist = [...new Set([...(currentUser?.watchlist || []), symbol])];
     const res = await fetch(`${API_BASE}/api/auth/watchlist`, {
-      method: 'PUT',
-      headers: authHeaders(),
+      method: 'PUT', headers: authHeaders(),
       body: JSON.stringify({ watchlist })
     });
     const data = await res.json();
@@ -374,14 +408,11 @@ async function addStock(symbol) {
     localStorage.setItem('user', JSON.stringify(currentUser));
 
     await fetch(`${API_BASE}/api/stocks`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ symbol })
     });
-
     await fetch(`${API_BASE}/api/stocks/fetch`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ symbol })
     });
 
@@ -389,32 +420,25 @@ async function addStock(symbol) {
     currentStock = symbol;
     renderStockTabs();
     showToast(`${symbol} added. Fetching news...`);
-    document.getElementById('news-grid').innerHTML =
-      `<div class="loading">Fetching news for ${symbol}...</div>`;
+    document.getElementById('news-grid').innerHTML = `<div class="loading">Fetching news for ${symbol}...</div>`;
 
     let attempts = 0;
     const poll = setInterval(async () => {
       attempts++;
       await fetchNews();
-      if (attempts > 12) {
-        clearInterval(poll);
-        showToast(`Done fetching news for ${symbol}`);
-      }
+      if (attempts > 12) { clearInterval(poll); showToast(`Done loading ${symbol}`); }
     }, 5000);
-  } catch (e) {
-    showToast('Could not add stock. Try again.');
-  }
+  } catch (e) { showToast('Could not add stock. Try again.'); }
 }
-
-// ─── Refresh ──────────────────────────────────────────────────────────────────
 
 async function refreshNow() {
-  document.getElementById('refresh-btn').textContent = 'Loading...';
+  const btn = document.getElementById('refresh-btn');
+  if (btn) btn.textContent = 'Loading...';
   await fetchNews();
-  document.getElementById('refresh-btn').textContent = 'Refresh';
+  if (btn) btn.textContent = 'Refresh';
 }
 
-// ─── Utils ────────────────────────────────────────────────────────────────────
+// ── Utils ─────────────────────────────────────────────────────────────────
 
 function timeAgo(dateStr) {
   if (!dateStr) return '';
@@ -425,12 +449,8 @@ function timeAgo(dateStr) {
   return `${Math.floor(diff / 86400)}d ago`;
 }
 
-// ─── Init ─────────────────────────────────────────────────────────────────────
+// ── Init ──────────────────────────────────────────────────────────────────
 
-if (isLoggedIn()) {
-  showMainPage();
-} else {
-  showAuthPage();
-}
+if (isLoggedIn()) { showMainPage(); } else { showAuthPage(); }
 
 setInterval(() => { if (isLoggedIn()) fetchNews(); }, 30000);

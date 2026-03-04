@@ -11,7 +11,7 @@
   <div id="toast" class="toast"></div>
 
   <!-- Auth Page -->
-  <div id="auth-page" style="display:none; justify-content:center; align-items:center; min-height:100vh; background:#0d0d1a;">
+  <div id="auth-page" style="display:none; justify-content:center; align-items:center; min-height:100vh; background:#000;">
     <div class="auth-box">
       <h1 class="auth-logo">MarketPulse</h1>
       <p class="auth-sub">Real-time market intelligence</p>
@@ -37,16 +37,16 @@
   <!-- Main Page -->
   <div id="main-page" style="display:none">
     <header>
-      <div class="header-inner">
+
+      <!-- Top bar: Logo + Search icon + Profile -->
+      <div class="top-bar">
         <div class="logo">MarketPulse</div>
-        <div class="status-bar">
-          <span id="last-updated"></span>
-          <select id="sort-select" onchange="changeSort()">
-            <option value="newest">Newest</option>
-            <option value="oldest">Oldest</option>
-          </select>
-          <button id="refresh-btn" onclick="refreshNow()">Refresh</button>
-          <!-- Profile button -->
+        <div class="top-actions">
+          <button class="icon-btn" id="search-toggle" onclick="toggleSearch()">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+          </button>
           <div class="profile-wrap">
             <button class="profile-btn" id="profile-btn" onclick="toggleProfile()">
               <span id="profile-initial">U</span>
@@ -58,29 +58,42 @@
               </div>
               <button class="profile-item" onclick="filterByStock('bookmarks'); closeProfile()">Saved Articles</button>
               <button class="profile-item" onclick="showNewest()">Newest First</button>
+              <select class="profile-sort" id="sort-select" onchange="changeSort()">
+                <option value="newest">Newest First</option>
+                <option value="oldest">Oldest First</option>
+              </select>
+              <button class="profile-item" onclick="refreshNow(); closeProfile()">Refresh Feed</button>
               <button class="profile-item danger" onclick="logout()">Logout</button>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Search -->
-      <div class="search-wrap">
-        <input id="stock-search" class="search-bar" type="text"
-          placeholder="Search or add stock symbol (e.g. NVDA, NFLX)..."
-          onkeydown="handleSearch(event)" />
+      <!-- Expandable search bar -->
+      <div class="search-wrap" id="search-wrap" style="display:none">
+        <div class="search-inner">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="2.5" style="flex-shrink:0">
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          <input id="stock-search" class="search-bar" type="text"
+            placeholder="Search stocks (e.g. AAPL, Google...)"
+            oninput="showSuggestions()"
+            onkeydown="handleSearch(event)" />
+          <button class="search-close" onclick="toggleSearch()">✕</button>
+        </div>
+        <div id="suggestions" class="suggestions"></div>
       </div>
 
-      <!-- Stock tabs -->
+      <!-- Circular stock tabs -->
       <div class="stock-tabs" id="stock-tabs"></div>
 
-      <!-- Sentiment filters -->
+      <!-- 3 sentiment buttons full width -->
       <div class="sentiment-filters">
-        <button class="sentiment-btn all active" onclick="filterBySentiment('all')">All</button>
         <button class="sentiment-btn bullish" onclick="filterBySentiment('bullish')">Bullish</button>
         <button class="sentiment-btn bearish" onclick="filterBySentiment('bearish')">Bearish</button>
-        <button class="sentiment-btn neutral" onclick="filterBySentiment('neutral')">Neutral</button>
+        <button class="sentiment-btn neutral active" onclick="filterBySentiment('all')">All</button>
       </div>
+
     </header>
 
     <main id="news-grid" class="news-grid">
@@ -90,4 +103,4 @@
 
   <script src="app.js"></script>
 </body>
-</html>
+</html> 
