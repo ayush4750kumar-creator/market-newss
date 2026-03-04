@@ -113,16 +113,16 @@ header {
 
 .profile-dropdown {
   display: none;
-  position: absolute;
-  top: calc(100% + 10px);
-  right: 0;
+  position: fixed;
+  top: 60px;
+  right: 12px;
   background: #111;
   border: 1px solid #222;
   border-radius: 14px;
   min-width: 200px;
-  box-shadow: 0 12px 40px rgba(0,0,0,0.7);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.9);
   overflow: hidden;
-  z-index: 999;
+  z-index: 99999;
 }
 .profile-dropdown.open { display: block; }
 
@@ -718,7 +718,7 @@ header {
   text-align: center;
 }
 .about-footer p {
-  font-size: 16px;
+  font-size: 12px;
   color: #333;
   margin-bottom: 4px;
 }
