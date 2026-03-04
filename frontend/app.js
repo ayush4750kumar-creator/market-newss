@@ -1,3 +1,4 @@
+// MarketPulse v2
 const API_BASE = 'https://market-newss-production.up.railway.app';
 
 let currentStock = 'global';
