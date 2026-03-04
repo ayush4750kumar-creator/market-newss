@@ -78,7 +78,9 @@
           <input id="stock-search" class="search-bar" type="text"
             placeholder="Search stocks (e.g. AAPL, Google...)"
             oninput="showSuggestions()"
-            onkeydown="handleSearch(event)" />
+            onkeydown="handleSearch(event)"
+            spellcheck="false"
+            autocomplete="off" />
           <button class="search-close" onclick="toggleSearch()">✕</button>
         </div>
         <div id="suggestions" class="suggestions"></div>
@@ -103,4 +105,4 @@
 
   <script src="app.js"></script>
 </body>
-</html> 
+</html>

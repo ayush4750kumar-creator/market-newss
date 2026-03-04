@@ -275,8 +275,8 @@ function renderNews() {
             ${isBookmarked ? 'Saved' : 'Save'}
           </button>
         </div>
-        <div class="card-headline" onclick="window.open('${item.url || '#'}', '_blank')">${item.headline}</div>
-        <div class="card-story">${item.story}</div>
+        <div class="card-headline" spellcheck="false" onclick="window.open('${item.url || '#'}', '_blank')">${item.headline}</div>
+        <div class="card-story" spellcheck="false">${item.story}</div>
         <div class="sentiment-tag ${item.sentiment}">${item.sentiment === 'bullish' ? 'Bullish' : item.sentiment === 'bearish' ? 'Bearish' : 'Neutral'}</div>
         <div class="card-source">${item.source}</div>
       </div>
@@ -300,8 +300,8 @@ function renderStockTabs() {
     <div class="tab-wrap" id="wrap-${s}">
       <button class="tab ${currentStock === s ? 'active' : ''}"
         onclick="filterByStock('${s}')"
-        onmousedown="startLongPress('${s}')" onmouseup="cancelLongPress()" onmouseleave="cancelLongPress()"
-        ontouchstart="startLongPress('${s}')" ontouchend="cancelLongPress()"
+        onmousedown="startLongPress(event, '${s}')" onmouseup="cancelLongPress()" onmouseleave="cancelLongPress()"
+        ontouchstart="startLongPress(event, '${s}')" ontouchend="cancelLongPress()"
       >${s}</button>
       <div class="tab-context-menu" id="ctx-${s}">
         <button class="tab-context-item" onclick="removeStock('${s}')">Remove ${s}</button>
@@ -318,14 +318,34 @@ function renderStockTabs() {
   `;
 }
 
-// ── Long Press ────────────────────────────────────────────────────────────
+// ── Long Press — position menu using fixed coords so it pops above sentiment bar ──
 
-function startLongPress(symbol) {
+function startLongPress(e, symbol) {
   cancelLongPress();
+  // Capture button position before timeout
+  const btn = e.currentTarget || e.target;
   longPressTimer = setTimeout(() => {
     closeAllContextMenus();
     const menu = document.getElementById(`ctx-${symbol}`);
-    if (menu) menu.classList.add('open');
+    if (!menu) return;
+
+    // Temporarily show off-screen to measure width
+    menu.style.visibility = 'hidden';
+    menu.style.display = 'block';
+    const menuW = menu.offsetWidth;
+    menu.style.display = '';
+    menu.style.visibility = '';
+
+    // Get button bounding rect for fixed positioning
+    const rect = btn.getBoundingClientRect();
+    const top = rect.top - 8;            // just above the button
+    const left = rect.left + rect.width / 2 - menuW / 2;
+
+    menu.style.top = `${top}px`;
+    menu.style.left = `${Math.max(8, left)}px`;
+    menu.style.transform = 'translateY(-100%)';
+
+    menu.classList.add('open');
   }, 600);
 }
 
@@ -334,7 +354,12 @@ function cancelLongPress() {
 }
 
 function closeAllContextMenus() {
-  document.querySelectorAll('.tab-context-menu').forEach(m => m.classList.remove('open'));
+  document.querySelectorAll('.tab-context-menu').forEach(m => {
+    m.classList.remove('open');
+    m.style.top = '';
+    m.style.left = '';
+    m.style.transform = '';
+  });
 }
 
 // ── Actions ───────────────────────────────────────────────────────────────
