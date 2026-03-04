@@ -1,6 +1,11 @@
 @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@300;400;500;600;700&display=swap');
 
-* { margin: 0; padding: 0; box-sizing: border-box; }
+/* ── Disable selection everywhere except card content ── */
+* { -webkit-user-select: none; user-select: none; }
+.card-headline, .card-story, .card-source, .sentiment-tag {
+  -webkit-user-select: text;
+  user-select: text;
+}
 
 html, body {
   font-family: 'Inter', system-ui, sans-serif;
@@ -302,14 +307,15 @@ header {
 .sentiment-btn.bearish.active { background: #c62828; color: #fff; }
 .sentiment-btn.neutral.active { background: #424242; color: #fff; }
 
-/* ── News Grid ── */
+/* ── News Grid — fills left to right ── */
 .news-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 12px;
+  columns: 1;
+  column-gap: 12px;
   padding: 16px;
   background: #000;
 }
+@media (min-width: 640px) { .news-grid { columns: 2; } }
+@media (min-width: 1024px) { .news-grid { columns: 3; } }
 
 /* ── News Card ── */
 .news-card {
@@ -318,6 +324,8 @@ header {
   overflow: hidden;
   transition: transform 0.2s;
   box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+  break-inside: avoid;
+  margin-bottom: 12px;
 }
 .news-card:hover { transform: translateY(-2px); }
 .news-card.bullish { border-top: 3px solid #00c853; }

@@ -275,8 +275,8 @@ function renderNews() {
             ${isBookmarked ? 'Saved' : 'Save'}
           </button>
         </div>
-        <div class="card-headline" spellcheck="false" onclick="window.open('${item.url || '#'}', '_blank')">${item.headline}</div>
-        <div class="card-story" spellcheck="false">${item.story}</div>
+        <div class="card-headline" spellcheck="false" onclick="window.open('${item.url || '#'}', '_blank')">${stripLinks(item.headline)}</div>
+        <div class="card-story" spellcheck="false">${stripLinks(item.story)}</div>
         <div class="sentiment-tag ${item.sentiment}">${item.sentiment === 'bullish' ? 'Bullish' : item.sentiment === 'bearish' ? 'Bearish' : 'Neutral'}</div>
         <div class="card-source">${item.source}</div>
       </div>
@@ -472,6 +472,14 @@ function timeAgo(dateStr) {
   if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
   if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
   return `${Math.floor(diff / 86400)}d ago`;
+}
+
+// Strip HTML tags (especially <a> links) from text — keeps plain text only
+function stripLinks(html) {
+  if (!html) return '';
+  return html
+    .replace(/<a\b[^>]*>(.*?)<\/a>/gi, '$1')  // unwrap <a> tags, keep inner text
+    .replace(/<[^>]+>/g, '');                  // strip any remaining tags
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────
