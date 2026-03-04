@@ -117,7 +117,7 @@ function showSuggestions() {
   ).slice(0, 5);
 
   if (matches.length === 0) {
-    container.innerHTML = `<div class="suggestion-item" onclick="addStock('${val}')">Add "${val}" <span>New stock</span></div>`;
+    container.innerHTML = `<div class="suggestion-item" onclick="selectSuggestion('${val}')">Search "${val}" <span>View news</span></div>`;
     return;
   }
 
@@ -132,19 +132,20 @@ function selectSuggestion(symbol) {
   document.getElementById('stock-search').value = '';
   document.getElementById('suggestions').innerHTML = '';
   document.getElementById('search-wrap').style.display = 'none';
-  if (trackedStocks.includes(symbol)) {
-    filterByStock(symbol);
-    showToast('Switched to ' + symbol);
-  } else {
-    addStock(symbol);
-  }
+  // Search only filters news — does NOT add to watchlist
+  filterByStock(symbol);
+  showToast('Showing news for ' + symbol);
 }
 
 function handleSearch(e) {
   if (e.key === 'Enter') {
     const val = document.getElementById('stock-search').value.trim().toUpperCase();
     if (!val) return;
-    selectSuggestion(val);
+    document.getElementById('stock-search').value = '';
+    document.getElementById('suggestions').innerHTML = '';
+    document.getElementById('search-wrap').style.display = 'none';
+    filterByStock(val);
+    showToast('Showing news for ' + val);
   }
 }
 
@@ -474,12 +475,12 @@ function timeAgo(dateStr) {
   return `${Math.floor(diff / 86400)}d ago`;
 }
 
-// Strip HTML tags (especially <a> links) from text — keeps plain text only
+// Bulletproof strip — removes ALL html tags, returns plain text only
 function stripLinks(html) {
   if (!html) return '';
-  return html
-    .replace(/<a\b[^>]*>(.*?)<\/a>/gi, '$1')  // unwrap <a> tags, keep inner text
-    .replace(/<[^>]+>/g, '');                  // strip any remaining tags
+  const div = document.createElement('div');
+  div.innerHTML = html;
+  return div.textContent || div.innerText || '';
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────

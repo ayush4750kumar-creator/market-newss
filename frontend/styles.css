@@ -211,7 +211,7 @@ header {
 .tab {
   background: #111;
   border: 1.5px solid #222;
-  color: #666;
+  color: #fff;
   padding: 7px 18px;
   border-radius: 50px;
   cursor: pointer;
@@ -221,7 +221,7 @@ header {
   flex-shrink: 0;
   transition: all 0.2s;
 }
-.tab:hover { border-color: #444; color: #ccc; }
+.tab:hover { border-color: #444; color: #fff; }
 .tab.active {
   background: #1a56db;
   color: #fff;
@@ -359,7 +359,7 @@ header {
 
 .card-headline {
   font-family: 'Playfair Display', serif;
-  font-size: 16px;
+  font-size: 19px;
   font-weight: 600;
   color: #111;
   line-height: 1.5;
@@ -371,7 +371,7 @@ header {
 .card-headline:hover { color: #1a56db; }
 
 .card-story {
-  font-size: 13px;
+  font-size: 15px;
   color: #666;
   line-height: 1.8;
   margin-bottom: 10px;
