@@ -302,28 +302,22 @@ header {
 .sentiment-btn.bearish.active { background: #c62828; color: #fff; }
 .sentiment-btn.neutral.active { background: #424242; color: #fff; }
 
-/* ── News Grid — uniform card sizes ── */
+/* ── News Grid ── */
 .news-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 12px;
   padding: 16px;
   background: #000;
-  /* uniform row height */
-  grid-auto-rows: 1fr;
-  align-items: stretch;
 }
 
-/* ── News Card — uniform height ── */
+/* ── News Card ── */
 .news-card {
   background: #ffffff;
   border-radius: 14px;
   overflow: hidden;
   transition: transform 0.2s;
   box-shadow: 0 2px 12px rgba(0,0,0,0.3);
-  display: flex;
-  flex-direction: column;
-  height: 100%;
 }
 .news-card:hover { transform: translateY(-2px); }
 .news-card.bullish { border-top: 3px solid #00c853; }
@@ -332,9 +326,6 @@ header {
 
 .card-body {
   padding: 16px;
-  display: flex;
-  flex-direction: column;
-  flex: 1;
 }
 
 .card-meta {
@@ -367,9 +358,7 @@ header {
   margin-bottom: 8px;
   cursor: pointer;
   transition: color 0.2s;
-  /* no red spell-check underline */
   text-decoration: none;
-  -webkit-text-decoration: none;
 }
 .card-headline:hover { color: #1a56db; }
 
@@ -378,11 +367,6 @@ header {
   color: #666;
   line-height: 1.8;
   margin-bottom: 10px;
-  flex: 1;                /* fills remaining space — makes cards uniform */
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-line-clamp: 4;  /* clamp to 4 lines so all cards same height */
-  -webkit-box-orient: vertical;
 }
 
 .sentiment-tag {
@@ -404,7 +388,6 @@ header {
   color: #bbb;
   border-top: 1px solid #f0f0f0;
   padding-top: 8px;
-  margin-top: auto;
 }
 
 .bookmark-btn {
