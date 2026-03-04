@@ -348,7 +348,6 @@ function renderStockTabs() {
     <div class="tab-wrap" id="wrap-${s}">
       <button class="tab ${currentStock === s ? 'active' : ''}"
         onclick="filterByStock('${s}')"
-        onmousedown="startLongPress(event, '${s}')" onmouseup="cancelLongPress()" onmouseleave="cancelLongPress()"
       >${s}</button>
       <div class="tab-context-menu" id="ctx-${s}">
         <button class="tab-context-item" onclick="removeStock('${s}')">Remove ${s}</button>
@@ -369,6 +368,27 @@ function renderStockTabs() {
     const btn = document.querySelector(`#wrap-${s} .tab`);
     if (!btn) return;
     let timer = null;
+    btn.addEventListener('mousedown', (e) => {
+      timer = setTimeout(() => {
+        timer = null;
+        closeAllContextMenus();
+        const menu = document.getElementById(`ctx-${s}`);
+        if (!menu) return;
+        menu.style.visibility = 'hidden';
+        menu.style.display = 'block';
+        const menuW = menu.offsetWidth;
+        menu.style.display = '';
+        menu.style.visibility = '';
+        const rect = btn.getBoundingClientRect();
+        menu.style.top = `${rect.top - 8}px`;
+        menu.style.left = `${Math.max(8, rect.left + rect.width / 2 - menuW / 2)}px`;
+        menu.style.transform = 'translateY(-100%)';
+        menu.classList.add('open');
+        if (navigator.vibrate) navigator.vibrate(50);
+      }, 600);
+    });
+    btn.addEventListener('mouseup', () => { if (timer) { clearTimeout(timer); timer = null; } });
+    btn.addEventListener('mouseleave', () => { if (timer) { clearTimeout(timer); timer = null; } });
     btn.addEventListener('touchstart', (e) => {
       timer = setTimeout(() => {
         timer = null;
