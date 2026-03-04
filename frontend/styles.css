@@ -12,20 +12,37 @@ input, select, textarea {
   font-size: 16px !important;
 }
 
-/* ── Prevent accidental zoom on double-tap ── */
-header, .stock-tabs, .sentiment-filters {
-  touch-action: pan-x pan-y;
+/* ── All buttons easy to tap, no delay ── */
+button, a, .suggestion-item, .tab, .tab-add, .sentiment-btn {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  cursor: pointer;
 }
 
-html, body {
+html {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
   font-family: 'Inter', system-ui, sans-serif;
   background: #000000;
   color: #e8e8e8;
-  min-height: 100vh;
+  height: 100%;
   width: 100%;
   overflow-x: hidden;
-  position: relative;
+  overflow-y: auto;
   overscroll-behavior: none;
+  -webkit-overflow-scrolling: touch;
+  position: fixed;
+  width: 100%;
+}
+
+#main-page {
+  height: 100vh;
+  overflow-y: auto;
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* ── Header ── */
@@ -224,14 +241,17 @@ header {
   background: #111;
   border: 1.5px solid #222;
   color: #fff;
-  padding: 7px 18px;
+  padding: 10px 20px;
   border-radius: 50px;
   cursor: pointer;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 500;
   white-space: nowrap;
   flex-shrink: 0;
-  transition: all 0.2s;
+  transition: background 0.15s;
+  min-height: 44px;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 .tab:hover { border-color: #444; color: #fff; }
 .tab.active {

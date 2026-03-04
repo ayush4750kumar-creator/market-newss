@@ -319,7 +319,6 @@ function renderStockTabs() {
       <button class="tab ${currentStock === s ? 'active' : ''}"
         onclick="filterByStock('${s}')"
         onmousedown="startLongPress(event, '${s}')" onmouseup="cancelLongPress()" onmouseleave="cancelLongPress()"
-        ontouchstart="startLongPress(event, '${s}')" ontouchend="cancelLongPress()"
       >${s}</button>
       <div class="tab-context-menu" id="ctx-${s}">
         <button class="tab-context-item" onclick="removeStock('${s}')">Remove ${s}</button>
@@ -334,6 +333,34 @@ function renderStockTabs() {
     ${stockTabsHTML}
     <button class="tab-add" onclick="toggleSearch()">+ Add</button>
   `;
+
+  // Attach touch long press AFTER rendering, without preventDefault so clicks still work
+  trackedStocks.forEach(s => {
+    const btn = document.querySelector(`#wrap-${s} .tab`);
+    if (!btn) return;
+    let timer = null;
+    btn.addEventListener('touchstart', (e) => {
+      timer = setTimeout(() => {
+        timer = null;
+        closeAllContextMenus();
+        const menu = document.getElementById(`ctx-${s}`);
+        if (!menu) return;
+        menu.style.visibility = 'hidden';
+        menu.style.display = 'block';
+        const menuW = menu.offsetWidth;
+        menu.style.display = '';
+        menu.style.visibility = '';
+        const rect = btn.getBoundingClientRect();
+        menu.style.top = `${rect.top - 8}px`;
+        menu.style.left = `${Math.max(8, rect.left + rect.width / 2 - menuW / 2)}px`;
+        menu.style.transform = 'translateY(-100%)';
+        menu.classList.add('open');
+        if (navigator.vibrate) navigator.vibrate(50);
+      }, 600);
+    }, { passive: true });
+    btn.addEventListener('touchend', () => { if (timer) { clearTimeout(timer); timer = null; } });
+    btn.addEventListener('touchmove', () => { if (timer) { clearTimeout(timer); timer = null; } });
+  });
 }
 
 // ── Long Press — works on both mobile touch and desktop mouse ──
