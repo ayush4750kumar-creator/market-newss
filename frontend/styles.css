@@ -144,20 +144,6 @@ header {
 .profile-item.danger { color: #f44336; }
 .profile-item.danger:hover { background: rgba(244,67,54,0.1); }
 
-.profile-sort {
-  width: 100%;
-  padding: 11px 16px;
-  background: none;
-  border: none;
-  border-top: 1px solid #1a1a1a;
-  border-bottom: 1px solid #1a1a1a;
-  color: #aaa;
-  font-size: 13px;
-  cursor: pointer;
-  font-family: 'Inter', sans-serif;
-}
-.profile-sort option { background: #111; }
-
 /* ── Search ── */
 .search-wrap {
   margin-bottom: 12px;

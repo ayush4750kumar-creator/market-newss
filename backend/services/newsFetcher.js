@@ -126,14 +126,14 @@ async function fetchFinnhubStock(symbol) {
 
   try {
     const res = await axios.get('https://finnhub.io/api/v1/company-news', {
-      params: { symbol: upper, from: formatDate(1), to: formatDate(0), token: config.FINNHUB_KEY }
+      params: { symbol: upper, from: formatDate(3), to: formatDate(0), token: config.FINNHUB_KEY }
     });
 
     if (res.data && res.data.length > 0) return mapFinnhubArticles(res.data, upper);
 
-    console.log(`  [newsFetcher] No fresh news for ${upper}, trying last 7 days...`);
+    console.log(`  [newsFetcher] No fresh news for ${upper}, trying last 30 days...`);
     const fallback = await axios.get('https://finnhub.io/api/v1/company-news', {
-      params: { symbol: upper, from: formatDate(7), to: formatDate(0), token: config.FINNHUB_KEY }
+      params: { symbol: upper, from: formatDate(30), to: formatDate(0), token: config.FINNHUB_KEY }
     });
 
     if (fallback.data && fallback.data.length > 0) return mapFinnhubArticles(fallback.data, upper);

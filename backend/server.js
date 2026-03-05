@@ -152,13 +152,14 @@ app.get('/api/news', (req, res) => {
   const { sentiment, stock, limit = 50, sort = 'newest' } = req.query;
   let news = stock ? (newsStore.byStock[stock] || []) : newsStore.all;
   if (sentiment && sentiment !== 'all') news = news.filter(n => n.sentiment === sentiment);
-  if (sort === 'oldest') news = [...news].reverse();
+  news = [...news].sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt));
+  if (sort === 'oldest') news = news.reverse();
   res.json({ news: news.slice(0, parseInt(limit)), lastUpdated: newsStore.lastUpdated, total: news.length });
 });
 
 app.get('/api/news/global', (req, res) => {
   const { sort = 'newest' } = req.query;
-  let news = [...newsStore.global];
+  let news = [...newsStore.global].sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt));
   if (sort === 'oldest') news = news.reverse();
   res.json({ news, lastUpdated: newsStore.lastUpdated });
 });
@@ -166,7 +167,7 @@ app.get('/api/news/global', (req, res) => {
 app.get('/api/news/stock/:symbol', (req, res) => {
   const symbol = req.params.symbol.toUpperCase();
   const { sort = 'newest' } = req.query;
-  let news = [...(newsStore.byStock[symbol] || [])];
+  let news = [...(newsStore.byStock[symbol] || [])].sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt));
   if (sort === 'oldest') news = news.reverse();
   res.json({ stock: symbol, news, lastUpdated: newsStore.lastUpdated });
 });

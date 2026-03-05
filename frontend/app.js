@@ -81,11 +81,6 @@ function toggleProfile() {
 function closeProfile() {
   document.getElementById('profile-dropdown').classList.remove('open');
 }
-function showNewest() {
-  currentSort = 'newest';
-  document.getElementById('sort-select').value = 'newest';
-  fetchNews(); closeProfile();
-}
 document.addEventListener('click', e => {
   if (!e.target.closest('.profile-wrap')) closeProfile();
   if (!e.target.closest('.tab-wrap')) closeAllContextMenus();
@@ -474,12 +469,6 @@ function filterBySentiment(sentiment) {
   document.querySelectorAll('.sentiment-btn').forEach(btn => btn.classList.remove('active'));
   if (currentSentiment !== 'all') event.target.classList.add('active');
   renderNews();
-  savePreferences();
-}
-
-function changeSort() {
-  currentSort = document.getElementById('sort-select').value;
-  fetchNews();
   savePreferences();
 }
 

@@ -60,10 +60,6 @@
               </div>
               <button class="profile-item" onclick="filterByStock('bookmarks'); closeProfile()">Saved Articles</button>
               <button class="profile-item" onclick="showAboutPage(); closeProfile()">About</button>
-              <select class="profile-sort" id="sort-select" onchange="changeSort()">
-                <option value="newest">Newest</option>
-                <option value="oldest">Oldest First</option>
-              </select>
               <button class="profile-item" onclick="refreshNow(); closeProfile()">Refresh Feed</button>
               <button class="profile-item danger" onclick="logout()">Logout</button>
             </div>
@@ -164,10 +160,4 @@
         </div>
       </div>
 
-      <div class="about-footer">      </div>
-    </div>
-  </div>
-
-  <script src="app.js"></script>
-</body>
-</html>
+      <div class="about-footer">
