@@ -7,12 +7,12 @@ const { runAgentP } = require('./agents/agentP');
 const { runAgentA } = require('./agents/agentA');
 const { runAgentB } = require('./agents/agentB');
 const { initDB, pool, saveNews, loadNews } = require('./services/database');
-const { router: authRouter, authenticate } = require('./routes/auth');
+const { router: authRouter } = require('./routes/auth');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
-app.use(express.static('frontend')); // ✅ fixed from 'public'
+app.use(express.static('frontend'));
 
 let newsStore = {
   all: [],
@@ -23,6 +23,17 @@ let newsStore = {
 };
 
 let trackedStocks = [...config.DEFAULT_STOCKS];
+
+// ✅ Rebuild newsStore.all from stock + global — no duplicates
+function rebuildAll() {
+  const stockNews = Object.values(newsStore.byStock).flat();
+  const allNews = [...newsStore.global, ...stockNews];
+  const seen = new Set();
+  newsStore.all = allNews
+    .filter(a => { if (seen.has(a.id)) return false; seen.add(a.id); return true; })
+    .sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt))
+    .slice(0, 200);
+}
 
 async function loadAllUserStocks() {
   try {
@@ -35,13 +46,14 @@ async function loadAllUserStocks() {
   }
 }
 
+// ✅ Load saved news from DB and prime dedup cache
 async function loadNewsFromDB() {
   try {
     const articles = await loadNews();
     if (articles.length === 0) return;
 
-    newsStore.all = articles;
-    newsStore.lastUpdated = articles[0]?.publishedAt || new Date().toISOString();
+    const { filterNew } = require('./services/dedup');
+    filterNew(articles); // prime dedup cache with existing IDs
 
     articles.forEach(item => {
       if (item.stock) {
@@ -52,12 +64,15 @@ async function loadNewsFromDB() {
       }
     });
 
-    console.log(`[DB] Loaded ${articles.length} articles from database`);
+    rebuildAll();
+    newsStore.lastUpdated = articles[0]?.publishedAt || new Date().toISOString();
+    console.log(`[DB] Loaded ${articles.length} articles, dedup cache primed`);
   } catch (err) {
     console.error('[DB] Error loading news:', err.message);
   }
 }
 
+// ✅ Main pipeline — stock news only (global handled separately)
 async function runPipeline() {
   if (newsStore.isRunning) return;
   newsStore.isRunning = true;
@@ -66,36 +81,27 @@ async function runPipeline() {
   try {
     await loadAllUserStocks();
 
-    // ✅ Run Agent O and Agent P in parallel — no need to wait
-    const [stockArticles, globalArticles] = await Promise.all([
-      runAgentO(trackedStocks),
-      runAgentP()
-    ]);
+    const stockArticles = await runAgentO(trackedStocks);
+    console.log(`[Pipeline] Total raw articles: ${stockArticles.length}`);
 
-    const allRawArticles = [...stockArticles, ...globalArticles];
-    console.log(`[Pipeline] Total raw articles: ${allRawArticles.length}`);
-
-    if (allRawArticles.length === 0) {
+    if (stockArticles.length === 0) {
       newsStore.isRunning = false;
       return;
     }
 
-    const categorized = await runAgentA(allRawArticles);
+    const categorized = await runAgentA(stockArticles);
     const published = await runAgentB(categorized);
 
     await saveNews(published);
-
-    newsStore.all = [...published, ...newsStore.all].slice(0, 200);
 
     published.forEach(item => {
       if (item.stock) {
         if (!newsStore.byStock[item.stock]) newsStore.byStock[item.stock] = [];
         newsStore.byStock[item.stock] = [item, ...newsStore.byStock[item.stock]].slice(0, 50);
-      } else {
-        newsStore.global = [item, ...newsStore.global].slice(0, 50);
       }
     });
 
+    rebuildAll();
     newsStore.lastUpdated = new Date().toISOString();
     console.log('========== PIPELINE DONE ==========\n');
   } catch (err) {
@@ -105,40 +111,82 @@ async function runPipeline() {
   }
 }
 
-// ✅ Faster mini pipeline — fetch, analyze and publish in one go
-async function runMiniPipeline(symbol) {
-  console.log(`[Mini Pipeline] Starting for ${symbol}...`);
+// ✅ Global news pipeline — runs every 3 minutes
+let globalIsRunning = false;
+async function runGlobalPipeline() {
+  if (globalIsRunning) return;
+  globalIsRunning = true;
+  console.log('[Global Pipeline] Fetching global news...');
   try {
-    const { fetchFinnhubStock } = require('./services/newsFetcher');
+    const { fetchFinnhubGlobal } = require('./services/newsFetcher');
     const { filterNew } = require('./services/dedup');
 
-    // Fetch news
-    const articles = await fetchFinnhubStock(symbol);
-    const newArticles = filterNew(articles);
-
-    if (newArticles.length === 0) {
-      console.log(`[Mini Pipeline] No new articles for ${symbol}`);
-      // Still initialize empty store so tab shows
-      if (!newsStore.byStock[symbol]) newsStore.byStock[symbol] = [];
+    const articles = await fetchFinnhubGlobal();
+    if (!articles || articles.length === 0) {
+      console.log('[Global Pipeline] No articles fetched');
       return;
     }
 
-    console.log(`[Mini Pipeline] Got ${newArticles.length} new articles for ${symbol}, analyzing...`);
+    const isGlobalEmpty = newsStore.global.length === 0;
+    const newArticles = isGlobalEmpty ? articles : filterNew(articles);
 
-    // Limit to 5 articles for mini pipeline — fast turnaround
-    const limited = newArticles.slice(0, 5);
+    console.log(`[Global Pipeline] ${newArticles.length} new articles${isGlobalEmpty ? ' (dedup bypassed)' : ''}`);
+    if (newArticles.length === 0) return;
 
-    const categorized = await runAgentA(limited);
+    const categorized = await runAgentA(newArticles);
     const published = await runAgentB(categorized);
 
     await saveNews(published);
-
-    newsStore.all = [...published, ...newsStore.all].slice(0, 200);
-    if (!newsStore.byStock[symbol]) newsStore.byStock[symbol] = [];
-    newsStore.byStock[symbol] = [...published, ...newsStore.byStock[symbol]].slice(0, 50);
+    newsStore.global = [...published, ...newsStore.global].slice(0, 50);
+    rebuildAll();
     newsStore.lastUpdated = new Date().toISOString();
+    console.log(`[Global Pipeline] Published ${published.length} global articles`);
+  } catch (err) {
+    console.error('[Global Pipeline] Error:', err.message);
+  } finally {
+    globalIsRunning = false;
+  }
+}
 
-    console.log(`[Mini Pipeline] Done for ${symbol} — published ${published.length} articles`);
+// ✅ Mini pipeline — full Agent A + B, bypasses dedup for new stocks
+async function runMiniPipeline(symbol) {
+  console.log(`[Mini Pipeline] Starting for ${symbol}...`);
+  try {
+    const { fetchFinnhubStock, fetchArticleContent } = require('./services/newsFetcher');
+    const { filterNew } = require('./services/dedup');
+
+    if (!newsStore.byStock[symbol]) newsStore.byStock[symbol] = [];
+    const isNewStock = newsStore.byStock[symbol].length === 0;
+
+    const articles = await fetchFinnhubStock(symbol);
+    if (!articles || articles.length === 0) {
+      console.log(`[Mini Pipeline] No articles found for ${symbol}`);
+      return;
+    }
+
+    const newArticles = isNewStock ? articles : filterNew(articles);
+    if (newArticles.length === 0) {
+      console.log(`[Mini Pipeline] No new articles for ${symbol}`);
+      return;
+    }
+
+    // Enrich with full article content
+    const limited = newArticles.slice(0, 5);
+    const enriched = await Promise.all(limited.map(async a => {
+      const content = await fetchArticleContent(a.url);
+      if (content) a.description = content;
+      return a;
+    }));
+
+    console.log(`[Mini Pipeline] Running Agent A + B for ${symbol}...`);
+    const categorized = await runAgentA(enriched);
+    const published = await runAgentB(categorized);
+
+    await saveNews(published);
+    newsStore.byStock[symbol] = [...published, ...newsStore.byStock[symbol]].slice(0, 50);
+    rebuildAll();
+    newsStore.lastUpdated = new Date().toISOString();
+    console.log(`[Mini Pipeline] Done for ${symbol} — ${published.length} articles`);
   } catch (err) {
     console.error(`[Mini Pipeline] Error for ${symbol}:`, err.message);
   }
@@ -149,27 +197,19 @@ app.use('/api/auth', authRouter);
 
 // News routes
 app.get('/api/news', (req, res) => {
-  const { sentiment, stock, limit = 50, sort = 'newest' } = req.query;
+  const { sentiment, stock, limit = 50 } = req.query;
   let news = stock ? (newsStore.byStock[stock] || []) : newsStore.all;
   if (sentiment && sentiment !== 'all') news = news.filter(n => n.sentiment === sentiment);
-  news = [...news].sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt));
-  if (sort === 'oldest') news = news.reverse();
   res.json({ news: news.slice(0, parseInt(limit)), lastUpdated: newsStore.lastUpdated, total: news.length });
 });
 
 app.get('/api/news/global', (req, res) => {
-  const { sort = 'newest' } = req.query;
-  let news = [...newsStore.global].sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt));
-  if (sort === 'oldest') news = news.reverse();
-  res.json({ news, lastUpdated: newsStore.lastUpdated });
+  res.json({ news: newsStore.global, lastUpdated: newsStore.lastUpdated });
 });
 
 app.get('/api/news/stock/:symbol', (req, res) => {
   const symbol = req.params.symbol.toUpperCase();
-  const { sort = 'newest' } = req.query;
-  let news = [...(newsStore.byStock[symbol] || [])].sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt));
-  if (sort === 'oldest') news = news.reverse();
-  res.json({ stock: symbol, news, lastUpdated: newsStore.lastUpdated });
+  res.json({ stock: symbol, news: newsStore.byStock[symbol] || [], lastUpdated: newsStore.lastUpdated });
 });
 
 app.get('/api/stocks', (req, res) => {
@@ -193,7 +233,6 @@ app.delete('/api/stocks/:symbol', (req, res) => {
   res.json({ stocks: trackedStocks });
 });
 
-// ✅ Mini pipeline route
 app.post('/api/stocks/fetch', async (req, res) => {
   const { symbol } = req.body;
   if (!symbol) return res.status(400).json({ error: 'Symbol required' });
@@ -217,9 +256,18 @@ initDB().then(async () => {
   app.listen(config.PORT, () => {
     console.log(`✅ Server running on http://localhost:${config.PORT}`);
     runPipeline();
+    runGlobalPipeline();
+
+    // Stock news every 15 minutes
     cron.schedule(`*/${config.REFRESH_INTERVAL} * * * *`, () => {
-      console.log('[Cron] Scheduled pipeline run...');
+      console.log('[Cron] Stock pipeline run...');
       runPipeline();
+    });
+
+    // Global news every 3 minutes
+    cron.schedule('*/3 * * * *', () => {
+      console.log('[Cron] Global news refresh...');
+      runGlobalPipeline();
     });
   });
 }).catch(err => {

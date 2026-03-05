@@ -81,10 +81,12 @@ async function runBatch(articles, batchSize = 3) {
 }
 
 async function runAgentA(articles) {
-  console.log(`[Agent A] Analyzing ${articles.length} articles...`);
+  // Cap at 50 total to keep pipeline fast
+  const capped = articles.slice(0, 50);
+  console.log(`[Agent A] Analyzing ${capped.length} articles...`);
 
-  const toAnalyze = articles.slice(0, 30);
-  const skipped = articles.slice(30).map(a => ({ ...a, sentiment: 'neutral', reason: 'Skipped' }));
+  const toAnalyze = capped.slice(0, 30);
+  const skipped = capped.slice(30).map(a => ({ ...a, sentiment: 'neutral', reason: 'Skipped' }));
   const results = await runBatch(toAnalyze, 10);
   const allResults = [...results, ...skipped];
 

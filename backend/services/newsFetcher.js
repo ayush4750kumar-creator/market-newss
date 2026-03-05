@@ -12,6 +12,7 @@ const INDIAN_SYMBOLS = [
 ];
 
 const COMPANY_NAMES = {
+  // Indian stocks
   TCS: 'Tata Consultancy Services',
   RELIANCE: 'Reliance Industries',
   INFY: 'Infosys',
@@ -32,6 +33,29 @@ const COMPANY_NAMES = {
   SUNPHARMA: 'Sun Pharmaceutical',
   TECHM: 'Tech Mahindra',
   HCLTECH: 'HCL Technologies',
+  HAL: 'Hindustan Aeronautics Limited',
+  BPCL: 'Bharat Petroleum',
+  GAIL: 'GAIL India',
+  // US stocks
+  AAPL: 'Apple stock',
+  TSLA: 'Tesla stock',
+  GOOGL: 'Google Alphabet stock',
+  MSFT: 'Microsoft stock',
+  AMZN: 'Amazon stock',
+  META: 'Meta Facebook stock',
+  LLY: 'Eli Lilly stock',
+  ADBE: 'Adobe stock',
+  NVDA: 'Nvidia stock',
+  AMGN: 'Amgen stock',
+  JPM: 'JPMorgan stock',
+  BAC: 'Bank of America stock',
+  NFLX: 'Netflix stock',
+  AMD: 'AMD stock',
+  INTC: 'Intel stock',
+  DIS: 'Disney stock',
+  PYPL: 'PayPal stock',
+  UBER: 'Uber stock',
+  BABA: 'Alibaba stock',
 };
 
 function isIndianStock(symbol) {
@@ -47,7 +71,7 @@ function formatDate(daysAgo) {
 }
 
 function mapFinnhubArticles(data, symbol) {
-  return data.slice(0, 10).map(a => new Article({
+  const mapped = data.slice(0, 10).map(a => new Article({
     id: generateId(a.headline, 'finnhub-stock'),
     title: a.headline,
     description: a.summary,
@@ -57,6 +81,12 @@ function mapFinnhubArticles(data, symbol) {
     publishedAt: new Date(a.datetime * 1000).toISOString(),
     stock: symbol
   }));
+  
+  // Check if most articles have empty descriptions (paywall issue)
+  const emptyCount = mapped.filter(a => !a.description || a.description.length < 30).length;
+  const mostlyEmpty = emptyCount > mapped.length / 2;
+  
+  return { articles: mapped, mostlyEmpty };
 }
 
 // Google News RSS — free, no limit, no API key needed
@@ -115,35 +145,36 @@ async function fetchGoogleNews(symbol) {
   }
 }
 
-// Main fetcher — Google News for Indian stocks, Finnhub for US stocks
+// Main fetcher — use Google News RSS for all stocks (Finnhub as optional fallback)
 async function fetchFinnhubStock(symbol) {
   const upper = symbol.toUpperCase();
 
-  if (isIndianStock(upper)) {
-    console.log(`  [newsFetcher] Indian stock: ${upper} → Google News RSS`);
-    return await fetchGoogleNews(upper);
-  }
+  // Try Google News first — works for all stocks, no rate limits
+  const googleArticles = await fetchGoogleNews(upper);
+  if (googleArticles && googleArticles.length > 0) return googleArticles;
+
+  // Fallback to Finnhub only if Google RSS fails
+  if (isIndianStock(upper)) return [];
 
   try {
     const res = await axios.get('https://finnhub.io/api/v1/company-news', {
       params: { symbol: upper, from: formatDate(3), to: formatDate(0), token: config.FINNHUB_KEY }
     });
-
-    if (res.data && res.data.length > 0) return mapFinnhubArticles(res.data, upper);
-
-    console.log(`  [newsFetcher] No fresh news for ${upper}, trying last 30 days...`);
+    if (res.data && res.data.length > 0) {
+      const { articles } = mapFinnhubArticles(res.data, upper);
+      return articles;
+    }
     const fallback = await axios.get('https://finnhub.io/api/v1/company-news', {
       params: { symbol: upper, from: formatDate(30), to: formatDate(0), token: config.FINNHUB_KEY }
     });
-
-    if (fallback.data && fallback.data.length > 0) return mapFinnhubArticles(fallback.data, upper);
-
-    console.log(`  [newsFetcher] No Finnhub data for ${upper}, trying Google News...`);
-    return await fetchGoogleNews(upper);
-
+    if (fallback.data && fallback.data.length > 0) {
+      const { articles } = mapFinnhubArticles(fallback.data, upper);
+      return articles;
+    }
+    return [];
   } catch (err) {
     console.error(`Finnhub stock error for ${upper}:`, err.message);
-    return await fetchGoogleNews(upper);
+    return [];
   }
 }
 
@@ -168,4 +199,38 @@ async function fetchFinnhubGlobal() {
   }
 }
 
-module.exports = { fetchFinnhubStock, fetchFinnhubGlobal };
+// ── Fetch full article content — scrapes first few paragraphs ────────────
+async function fetchArticleContent(url) {
+  if (!url || url === '#') return null;
+  try {
+    const res = await axios.get(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept': 'text/html'
+      },
+      timeout: 6000,
+      maxRedirects: 3
+    });
+
+    const html = res.data;
+
+    // Extract text from <p> tags — skip nav/footer/ads
+    const paragraphs = [];
+    const pMatches = html.matchAll(/<p[^>]*>([\s\S]*?)<\/p>/gi);
+    for (const match of pMatches) {
+      // Strip HTML tags from paragraph
+      const text = match[1].replace(/<[^>]+>/g, '').trim();
+      if (text.length > 80) paragraphs.push(text);
+      if (paragraphs.length >= 3) break;
+    }
+
+    if (paragraphs.length === 0) return null;
+    return paragraphs.join(' ').slice(0, 600);
+
+  } catch (err) {
+    // Silently fail — paywall or timeout
+    return null;
+  }
+}
+
+module.exports = { fetchFinnhubStock, fetchFinnhubGlobal, fetchArticleContent };
