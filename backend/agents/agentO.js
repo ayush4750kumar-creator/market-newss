@@ -3,23 +3,20 @@ const { filterNew } = require('../services/dedup');
 
 async function runAgentO(stocks = []) {
   console.log(`[Agent O] Running for stocks: ${stocks.join(', ')}`);
+  const allArticles = [];
 
-  // Fetch all stocks in parallel — much faster than sequential
-  const results = await Promise.all(
-    stocks.map(async (symbol, i) => {
-      try {
-        console.log(`  [Agent O${i+1}] Fetching news for ${symbol}...`);
-        const articles = await fetchFinnhubStock(symbol);
-        console.log(`  [Agent O${i+1}] Found ${articles.length} articles for ${symbol}`);
-        return articles;
-      } catch (err) {
-        console.log(`  [Agent O${i+1}] Error fetching ${symbol}: ${err.message}`);
-        return [];
-      }
-    })
-  );
+  const stockPromises = stocks.map(async (symbol, index) => {
+    console.log(`  [Agent O${index + 1}] Fetching news for ${symbol}...`);
+    const articles = await fetchFinnhubStock(symbol);
+    console.log(`  [Agent O${index + 1}] Found ${articles.length} articles for ${symbol}`);
+    return articles;
+  });
 
-  const allArticles = results.flat();
+  const results = await Promise.allSettled(stockPromises);
+  results.forEach(r => {
+    if (r.status === 'fulfilled') allArticles.push(...r.value);
+  });
+
   const newArticles = filterNew(allArticles);
   console.log(`[Agent O] Total new articles: ${newArticles.length}`);
   return newArticles;
