@@ -20,10 +20,7 @@ async function publishArticle(article) {
         max_tokens: 150,
         temperature: 0.3,
         messages: [
-          {
-            role: 'system',
-            content: 'You are a financial news editor. Always respond with valid JSON only.'
-          },
+          { role: 'system', content: 'You are a financial news editor. Always respond with valid JSON only.' },
           {
             role: 'user',
             content: `Create a news card. Return JSON: {"headline":"short headline under 12 words","story":"50 words facts only no predictions"}
@@ -32,16 +29,10 @@ Description: ${description}`
           }
         ]
       },
-      {
-        headers: {
-          'Authorization': `Bearer ${config.GROQ_API_KEY}`,
-          'Content-Type': 'application/json'
-        }
-      }
+      { headers: { 'Authorization': `Bearer ${config.GROQ_API_KEY}`, 'Content-Type': 'application/json' } }
     );
     const raw = response.data.choices[0].message.content.trim();
     const parsed = JSON.parse(raw.replace(/```json|```/g, ''));
-
     return new ProcessedNews({
       id: article.id,
       headline: parsed.headline || title.slice(0, 80),
@@ -54,6 +45,7 @@ Description: ${description}`
       publishedAt: article.publishedAt
     });
   } catch (err) {
+    if (err.response?.status === 429) await new Promise(r => setTimeout(r, 3000));
     return new ProcessedNews({
       id: article.id,
       headline: title.slice(0, 80),
@@ -77,11 +69,14 @@ async function runAgentB(categorizedArticles) {
   ];
 
   const results = [];
+  const batchSize = 5;
 
-  for (let i = 0; i < allArticles.length; i++) {
-    const published = await publishArticle(allArticles[i]);
-    results.push(published);
-    await new Promise(r => setTimeout(r, 3000)); // wait 2.5s between each
+  for (let i = 0; i < allArticles.length; i += batchSize) {
+    const batch = allArticles.slice(i, i + batchSize);
+    console.log(`[Agent B] Batch ${Math.floor(i/batchSize)+1}/${Math.ceil(allArticles.length/batchSize)}...`);
+    const batchResults = await Promise.all(batch.map(a => publishArticle(a)));
+    results.push(...batchResults);
+    if (i + batchSize < allArticles.length) await new Promise(r => setTimeout(r, 800));
   }
 
   console.log(`[Agent B] Published ${results.length} news cards`);

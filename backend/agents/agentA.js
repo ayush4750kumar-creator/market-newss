@@ -4,8 +4,7 @@ const config = require('../config');
 async function analyzeArticle(article) {
   const title = (article.title || '').slice(0, 150);
   const description = (article.description || '').slice(0, 200);
-
-  if (!title && !description) return null; // ✅ skip empty
+  if (!title && !description) return null;
 
   try {
     const response = await axios.post(
@@ -15,10 +14,7 @@ async function analyzeArticle(article) {
         max_tokens: 100,
         temperature: 0.1,
         messages: [
-          {
-            role: 'system',
-            content: 'You are a financial analyst. Always respond with valid JSON only.'
-          },
+          { role: 'system', content: 'You are a financial analyst. Always respond with valid JSON only.' },
           {
             role: 'user',
             content: `Analyze this news article. 
@@ -31,44 +27,46 @@ Description: ${description}`
           }
         ]
       },
-      {
-        headers: {
-          'Authorization': `Bearer ${config.GROQ_API_KEY}`,
-          'Content-Type': 'application/json'
-        }
-      }
+      { headers: { 'Authorization': `Bearer ${config.GROQ_API_KEY}`, 'Content-Type': 'application/json' } }
     );
     const raw = response.data.choices[0].message.content.trim();
     const parsed = JSON.parse(raw.replace(/```json|```/g, ''));
-
-    // ✅ Filter out non-market articles
     if (!parsed.relevant) {
-      console.log(`[Agent A] Filtered out irrelevant: "${title.slice(0, 60)}"`);
+      console.log(`[Agent A] Filtered: "${title.slice(0, 60)}"`);
       return null;
     }
-
     return { ...article, sentiment: parsed.sentiment || 'neutral', reason: parsed.reason || '' };
   } catch (err) {
-    if (err.response) console.error('[Agent A] Error:', err.response.status);
+    if (err.response?.status === 429) {
+      // Rate limited — wait and retry once
+      await new Promise(r => setTimeout(r, 3000));
+      return { ...article, sentiment: 'neutral', reason: 'Rate limited' };
+    }
     return { ...article, sentiment: 'neutral', reason: 'Could not analyze' };
   }
 }
 
+// Run in batches of 5 in parallel — much faster than sequential
+async function runBatch(articles, batchSize = 5) {
+  const results = [];
+  for (let i = 0; i < articles.length; i += batchSize) {
+    const batch = articles.slice(i, i + batchSize);
+    console.log(`[Agent A] Processing batch ${Math.floor(i/batchSize)+1}/${Math.ceil(articles.length/batchSize)}...`);
+    const batchResults = await Promise.all(batch.map(a => analyzeArticle(a)));
+    results.push(...batchResults.filter(Boolean));
+    // Small delay between batches to avoid rate limits
+    if (i + batchSize < articles.length) await new Promise(r => setTimeout(r, 1000));
+  }
+  return results;
+}
+
 async function runAgentA(articles) {
   console.log(`[Agent A] Analyzing ${articles.length} articles...`);
-  console.log(`[Agent A] Groq key: ${config.GROQ_API_KEY ? 'FOUND' : 'NOT FOUND'}`);
 
   const toAnalyze = articles.slice(0, 20);
   const skipped = articles.slice(20).map(a => ({ ...a, sentiment: 'neutral', reason: 'Skipped' }));
 
-  const results = [];
-
-  for (let i = 0; i < toAnalyze.length; i++) {
-    const result = await analyzeArticle(toAnalyze[i]);
-    if (result) results.push(result); // ✅ only keep market-relevant
-    await new Promise(r => setTimeout(r, 4000));
-  }
-
+  const results = await runBatch(toAnalyze, 5);
   const allResults = [...results, ...skipped];
 
   const categorized = {
