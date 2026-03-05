@@ -45,7 +45,11 @@ Description: ${description}`
       publishedAt: article.publishedAt
     });
   } catch (err) {
-    if (err.response?.status === 429) await new Promise(r => setTimeout(r, 3000));
+    if (err.response?.status === 429) {
+      console.log(`[Agent B] Rate limited, waiting 5s...`);
+      await new Promise(r => setTimeout(r, 5000));
+    }
+    // Fallback — use raw title/description without AI formatting
     return new ProcessedNews({
       id: article.id,
       headline: title.slice(0, 80),
@@ -66,16 +70,17 @@ async function runAgentB(categorizedArticles) {
     ...categorizedArticles.bullish,
     ...categorizedArticles.bearish,
     ...categorizedArticles.neutral
-  ];
+  ].slice(0, 30); // max 30 articles — no need to process hundreds
 
   const results = [];
-  const batchSize = 5;
+  const batchSize = 3; // 3 parallel keeps us under Groq rate limits
 
   for (let i = 0; i < allArticles.length; i += batchSize) {
     const batch = allArticles.slice(i, i + batchSize);
     console.log(`[Agent B] Batch ${Math.floor(i/batchSize)+1}/${Math.ceil(allArticles.length/batchSize)}...`);
     const batchResults = await Promise.all(batch.map(a => publishArticle(a)));
     results.push(...batchResults);
+    // 800ms between batches — safe for Groq limits
     if (i + batchSize < allArticles.length) await new Promise(r => setTimeout(r, 800));
   }
 

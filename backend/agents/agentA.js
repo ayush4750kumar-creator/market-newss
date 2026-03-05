@@ -38,24 +38,44 @@ Description: ${description}`
     return { ...article, sentiment: parsed.sentiment || 'neutral', reason: parsed.reason || '' };
   } catch (err) {
     if (err.response?.status === 429) {
-      // Rate limited — wait and retry once
-      await new Promise(r => setTimeout(r, 3000));
-      return { ...article, sentiment: 'neutral', reason: 'Rate limited' };
+      // Rate limited — wait 5 seconds and retry once
+      console.log(`[Agent A] Rate limited, waiting 5s...`);
+      await new Promise(r => setTimeout(r, 5000));
+      try {
+        const retry = await axios.post(
+          'https://api.groq.com/openai/v1/chat/completions',
+          {
+            model: 'llama-3.3-70b-versatile',
+            max_tokens: 100,
+            temperature: 0.1,
+            messages: [
+              { role: 'system', content: 'You are a financial analyst. Always respond with valid JSON only.' },
+              { role: 'user', content: `Return JSON: {"relevant":true,"sentiment":"neutral","reason":"retry"}\nTitle: ${title}` }
+            ]
+          },
+          { headers: { 'Authorization': `Bearer ${config.GROQ_API_KEY}`, 'Content-Type': 'application/json' } }
+        );
+        const raw = retry.data.choices[0].message.content.trim();
+        const parsed = JSON.parse(raw.replace(/```json|```/g, ''));
+        return { ...article, sentiment: parsed.sentiment || 'neutral', reason: parsed.reason || '' };
+      } catch (retryErr) {
+        return { ...article, sentiment: 'neutral', reason: 'Rate limited' };
+      }
     }
     return { ...article, sentiment: 'neutral', reason: 'Could not analyze' };
   }
 }
 
-// Run in batches of 5 in parallel — much faster than sequential
-async function runBatch(articles, batchSize = 5) {
+// Run in batches of 3 — fast enough but won't trigger Groq rate limits
+async function runBatch(articles, batchSize = 3) {
   const results = [];
   for (let i = 0; i < articles.length; i += batchSize) {
     const batch = articles.slice(i, i + batchSize);
     console.log(`[Agent A] Processing batch ${Math.floor(i/batchSize)+1}/${Math.ceil(articles.length/batchSize)}...`);
     const batchResults = await Promise.all(batch.map(a => analyzeArticle(a)));
     results.push(...batchResults.filter(Boolean));
-    // Small delay between batches to avoid rate limits
-    if (i + batchSize < articles.length) await new Promise(r => setTimeout(r, 1000));
+    // 800ms between batches — stays under Groq's rate limit
+    if (i + batchSize < articles.length) await new Promise(r => setTimeout(r, 800));
   }
   return results;
 }
@@ -63,10 +83,9 @@ async function runBatch(articles, batchSize = 5) {
 async function runAgentA(articles) {
   console.log(`[Agent A] Analyzing ${articles.length} articles...`);
 
-  const toAnalyze = articles.slice(0, 20);
-  const skipped = articles.slice(20).map(a => ({ ...a, sentiment: 'neutral', reason: 'Skipped' }));
-
-  const results = await runBatch(toAnalyze, 5);
+  const toAnalyze = articles.slice(0, 30);
+  const skipped = articles.slice(30).map(a => ({ ...a, sentiment: 'neutral', reason: 'Skipped' }));
+  const results = await runBatch(toAnalyze, 10);
   const allResults = [...results, ...skipped];
 
   const categorized = {
