@@ -12,7 +12,7 @@ const { router: authRouter, authenticate } = require('./routes/auth');
 const app = express();
 app.use(cors());
 app.use(express.json());
-app.use(express.static('public'));
+app.use(express.static('frontend')); // ✅ fixed from 'public'
 
 let newsStore = {
   all: [],
@@ -24,7 +24,6 @@ let newsStore = {
 
 let trackedStocks = [...config.DEFAULT_STOCKS];
 
-// ✅ Load all user watchlist stocks from DB
 async function loadAllUserStocks() {
   try {
     const result = await pool.query('SELECT DISTINCT UNNEST(watchlist) as symbol FROM users');
@@ -36,7 +35,6 @@ async function loadAllUserStocks() {
   }
 }
 
-// ✅ Load saved news from DB into memory on startup
 async function loadNewsFromDB() {
   try {
     const articles = await loadNews();
@@ -68,9 +66,11 @@ async function runPipeline() {
   try {
     await loadAllUserStocks();
 
-    const stockArticles = await runAgentO(trackedStocks);
-    await new Promise(r => setTimeout(r, 2000));
-    const globalArticles = await runAgentP();
+    // ✅ Run Agent O and Agent P in parallel — no need to wait
+    const [stockArticles, globalArticles] = await Promise.all([
+      runAgentO(trackedStocks),
+      runAgentP()
+    ]);
 
     const allRawArticles = [...stockArticles, ...globalArticles];
     console.log(`[Pipeline] Total raw articles: ${allRawArticles.length}`);
@@ -83,7 +83,6 @@ async function runPipeline() {
     const categorized = await runAgentA(allRawArticles);
     const published = await runAgentB(categorized);
 
-    // ✅ Save to DB so news survives restarts
     await saveNews(published);
 
     newsStore.all = [...published, ...newsStore.all].slice(0, 200);
@@ -106,25 +105,32 @@ async function runPipeline() {
   }
 }
 
-// ✅ Mini pipeline for single stock
+// ✅ Faster mini pipeline — fetch, analyze and publish in one go
 async function runMiniPipeline(symbol) {
-  console.log(`[Mini Pipeline] Fetching news for ${symbol}...`);
+  console.log(`[Mini Pipeline] Starting for ${symbol}...`);
   try {
     const { fetchFinnhubStock } = require('./services/newsFetcher');
     const { filterNew } = require('./services/dedup');
 
+    // Fetch news
     const articles = await fetchFinnhubStock(symbol);
     const newArticles = filterNew(articles);
 
     if (newArticles.length === 0) {
       console.log(`[Mini Pipeline] No new articles for ${symbol}`);
+      // Still initialize empty store so tab shows
+      if (!newsStore.byStock[symbol]) newsStore.byStock[symbol] = [];
       return;
     }
 
-    const categorized = await runAgentA(newArticles);
+    console.log(`[Mini Pipeline] Got ${newArticles.length} new articles for ${symbol}, analyzing...`);
+
+    // Limit to 5 articles for mini pipeline — fast turnaround
+    const limited = newArticles.slice(0, 5);
+
+    const categorized = await runAgentA(limited);
     const published = await runAgentB(categorized);
 
-    // ✅ Save to DB
     await saveNews(published);
 
     newsStore.all = [...published, ...newsStore.all].slice(0, 200);
@@ -132,7 +138,7 @@ async function runMiniPipeline(symbol) {
     newsStore.byStock[symbol] = [...published, ...newsStore.byStock[symbol]].slice(0, 50);
     newsStore.lastUpdated = new Date().toISOString();
 
-    console.log(`[Mini Pipeline] Done for ${symbol}, published ${published.length} articles`);
+    console.log(`[Mini Pipeline] Done for ${symbol} — published ${published.length} articles`);
   } catch (err) {
     console.error(`[Mini Pipeline] Error for ${symbol}:`, err.message);
   }
@@ -205,7 +211,6 @@ app.get('/api/status', (req, res) => {
 });
 
 initDB().then(async () => {
-  // ✅ Load existing news from DB before starting
   await loadNewsFromDB();
 
   app.listen(config.PORT, () => {
