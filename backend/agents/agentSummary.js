@@ -5,15 +5,18 @@ async function fetchArticleData(url) {
   if (!url) return { text: null, image: null };
   try {
     const res = await axios.get(url, {
-      timeout: 5000,
+      timeout: 6000,
       headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36', 'Accept': 'text/html' },
-      maxRedirects: 3,
+      maxRedirects: 5,
     });
     const html = res.data || '';
-    // Extract og:image
-    const imgMatch = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i) ||
-                     html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i);
-    const image = imgMatch ? imgMatch[1] : null;
+    // Extract og:image or twitter:image
+    const imgMatch = html.match(/property=["']og:image["'][^>]+content=["']([^"']{10,})["']/i) ||
+                     html.match(/content=["']([^"']{10,})["'][^>]*property=["']og:image["']/i) ||
+                     html.match(/name=["']twitter:image["'][^>]+content=["']([^"']{10,})["']/i) ||
+                     html.match(/content=["']([^"']{10,})["'][^>]*name=["']twitter:image["']/i);
+    const rawImg = imgMatch ? imgMatch[1] : null;
+    const image = rawImg && rawImg.startsWith('http') ? rawImg : null;
     // Extract text
     const text = html.replace(/<script[\s\S]*?<\/script>/gi, '').replace(/<style[\s\S]*?<\/style>/gi, '').replace(/<[^>]+>/g, ' ').replace(/\s{2,}/g, ' ').trim().slice(0, 1500);
     return { text: text.length > 200 ? text : null, image };
