@@ -1,4 +1,4 @@
-const API_BASE = '/api';
+const API_BASE = '';
 
 let currentStock = 'global';
 let currentSentiment = 'all';
@@ -88,9 +88,6 @@ function showNewest() {
 document.addEventListener('click', e => {
   if (!e.target.closest('.profile-wrap')) closeProfile();
   if (!e.target.closest('.tab-wrap')) closeAllContextMenus();
-  if (!e.target.closest('.search-wrap') && !e.target.closest('#search-toggle')) {
-    // don't close on outside click if typing
-  }
 });
 
 // ── Search toggle ─────────────────────────────────────────────────────────
@@ -125,7 +122,6 @@ function showSuggestions() {
   ).slice(0, 4);
 
   if (isAddMode) {
-    // Add mode — show add to watchlist options
     const addNew = `<div class="suggestion-item" onclick="addStock('${valUpper}')">➕ Add "${valUpper}" to watchlist <span>new</span></div>`;
     const stockOptions = matches.map(s => `
       <div class="suggestion-item" onclick="addStock('${s.symbol}')">
@@ -134,7 +130,6 @@ function showSuggestions() {
     `).join('');
     container.innerHTML = addNew + stockOptions;
   } else {
-    // Search mode — keyword search
     const keywordOption = `<div class="suggestion-item" onclick="applyKeywordSearch('${val}')">🔍 Search "${val}" in all news <span>keyword</span></div>`;
     const stockOptions = matches.map(s => `
       <div class="suggestion-item" onclick="applyKeywordSearch('${s.symbol}')">
@@ -151,11 +146,7 @@ function applyKeywordSearch(keyword) {
   document.getElementById('stock-search').value = '';
   document.getElementById('suggestions').innerHTML = '';
   document.getElementById('search-wrap').style.display = 'none';
-
-  // Show loading state immediately
   document.getElementById('news-grid').innerHTML = `<div class="loading">Searching for "${keyword}"...</div>`;
-
-  // Delay then filter
   if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
   searchDebounceTimer = setTimeout(() => {
     searchKeyword = keyword.toLowerCase();
@@ -221,7 +212,7 @@ async function login() {
   const err = document.getElementById('login-error');
   err.textContent = '';
   try {
-    const res = await fetch(`${API_BASE}/api/auth/login`, {
+    const res = await fetch(`/api/auth/login`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password })
     });
@@ -239,7 +230,7 @@ async function register() {
   err.textContent = '';
   if (password.length < 6) { err.textContent = 'Password must be at least 6 characters.'; return; }
   try {
-    const res = await fetch(`${API_BASE}/api/auth/register`, {
+    const res = await fetch(`/api/auth/register`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password })
     });
@@ -262,7 +253,7 @@ function loadUserPreferences() {
 
 async function savePreferences() {
   if (!isLoggedIn()) return;
-  await fetch(`${API_BASE}/api/auth/preferences`, {
+  await fetch(`/api/auth/preferences`, {
     method: 'PUT', headers: authHeaders(),
     body: JSON.stringify({ preferences: { sentiment: currentSentiment, sort: currentSort } })
   });
@@ -272,10 +263,10 @@ async function savePreferences() {
 
 async function fetchNews() {
   try {
-    let url = `${API_BASE}/api/news/global?sort=${currentSort}`;
+    let url = `/api/news/global?sort=${currentSort}`;
     if (currentStock === 'bookmarks') { renderBookmarks(); return; }
-    else if (currentStock === 'all') url = `${API_BASE}/api/news?limit=100&sort=${currentSort}`;
-    else if (currentStock !== 'global') url = `${API_BASE}/api/news/stock/${currentStock}?sort=${currentSort}`;
+    else if (currentStock === 'all') url = `/api/news?limit=100&sort=${currentSort}`;
+    else if (currentStock !== 'global') url = `/api/news/stock/${currentStock}?sort=${currentSort}`;
 
     const res = await fetch(url, { headers: authHeaders() });
     const data = await res.json();
@@ -363,12 +354,11 @@ function renderStockTabs() {
     <button class="tab-add" onclick="toggleSearch('add')">+ Add</button>
   `;
 
-  // Attach touch long press AFTER rendering, without preventDefault so clicks still work
   trackedStocks.forEach(s => {
     const btn = document.querySelector(`#wrap-${s} .tab`);
     if (!btn) return;
     let timer = null;
-    btn.addEventListener('mousedown', (e) => {
+    btn.addEventListener('mousedown', () => {
       timer = setTimeout(() => {
         timer = null;
         closeAllContextMenus();
@@ -389,7 +379,7 @@ function renderStockTabs() {
     });
     btn.addEventListener('mouseup', () => { if (timer) { clearTimeout(timer); timer = null; } });
     btn.addEventListener('mouseleave', () => { if (timer) { clearTimeout(timer); timer = null; } });
-    btn.addEventListener('touchstart', (e) => {
+    btn.addEventListener('touchstart', () => {
       timer = setTimeout(() => {
         timer = null;
         closeAllContextMenus();
@@ -413,10 +403,7 @@ function renderStockTabs() {
   });
 }
 
-// ── Long Press — works on both mobile touch and desktop mouse ──
-
 function startLongPress(e, symbol) {
-  // prevent touch from firing click immediately
   if (e.type === 'touchstart') e.preventDefault();
   cancelLongPress();
   const btn = e.currentTarget || e.target;
@@ -424,23 +411,16 @@ function startLongPress(e, symbol) {
     closeAllContextMenus();
     const menu = document.getElementById(`ctx-${symbol}`);
     if (!menu) return;
-
     menu.style.visibility = 'hidden';
     menu.style.display = 'block';
     const menuW = menu.offsetWidth;
     menu.style.display = '';
     menu.style.visibility = '';
-
     const rect = btn.getBoundingClientRect();
-    const top = rect.top - 8;
-    const left = rect.left + rect.width / 2 - menuW / 2;
-
-    menu.style.top = `${top}px`;
-    menu.style.left = `${Math.max(8, left)}px`;
+    menu.style.top = `${rect.top - 8}px`;
+    menu.style.left = `${Math.max(8, rect.left + rect.width / 2 - menuW / 2)}px`;
     menu.style.transform = 'translateY(-100%)';
     menu.classList.add('open');
-
-    // vibrate on mobile for feedback
     if (navigator.vibrate) navigator.vibrate(50);
   }, 600);
 }
@@ -462,7 +442,7 @@ function closeAllContextMenus() {
 
 function filterByStock(stock) {
   currentStock = stock;
-  searchKeyword = '';   // clear any keyword search when switching tabs
+  searchKeyword = '';
   closeAllContextMenus();
   fetchNews();
   renderStockTabs();
@@ -486,7 +466,7 @@ async function toggleBookmark(e, article) {
   e.stopPropagation();
   if (!isLoggedIn()) return;
   try {
-    const res = await fetch(`${API_BASE}/api/auth/bookmarks`, {
+    const res = await fetch(`/api/auth/bookmarks`, {
       method: 'POST', headers: authHeaders(),
       body: JSON.stringify({ article })
     });
@@ -503,7 +483,7 @@ async function removeStock(symbol) {
   if (!confirm(`Remove ${symbol} from your watchlist?`)) return;
   try {
     const watchlist = (currentUser?.watchlist || []).filter(s => s !== symbol);
-    const res = await fetch(`${API_BASE}/api/auth/watchlist`, {
+    const res = await fetch(`/api/auth/watchlist`, {
       method: 'PUT', headers: authHeaders(),
       body: JSON.stringify({ watchlist })
     });
@@ -521,7 +501,7 @@ async function removeStock(symbol) {
 async function addStock(symbol) {
   try {
     const watchlist = [...new Set([...(currentUser?.watchlist || []), symbol])];
-    const res = await fetch(`${API_BASE}/api/auth/watchlist`, {
+    const res = await fetch(`/api/auth/watchlist`, {
       method: 'PUT', headers: authHeaders(),
       body: JSON.stringify({ watchlist })
     });
@@ -529,11 +509,11 @@ async function addStock(symbol) {
     currentUser.watchlist = data.watchlist;
     localStorage.setItem('user', JSON.stringify(currentUser));
 
-    await fetch(`${API_BASE}/api/stocks`, {
+    await fetch(`/api/stocks`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ symbol })
     });
-    await fetch(`${API_BASE}/api/stocks/fetch`, {
+    await fetch(`/api/stocks/fetch`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ symbol })
     });
@@ -571,7 +551,6 @@ function timeAgo(dateStr) {
   return `${Math.floor(diff / 86400)}d ago`;
 }
 
-// Bulletproof strip — removes ALL html tags, returns plain text only
 function stripLinks(html) {
   if (!html) return '';
   const div = document.createElement('div');

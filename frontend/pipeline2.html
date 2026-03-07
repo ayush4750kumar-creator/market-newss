@@ -9,7 +9,6 @@
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css" />
   <style>
-    /* ── Extra styles only for pipeline2 page ── */
     .pipeline-header {
       background: #000;
       border-bottom: 1px solid #1a1a1a;
@@ -63,8 +62,6 @@
     }
     .run-btn:hover { background: #1e40af; }
     .run-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-
-    /* Stats bar */
     .stats-bar {
       display: flex;
       gap: 8px;
@@ -85,19 +82,10 @@
       align-items: center;
       gap: 6px;
     }
-    .stat-pill .stat-num {
-      font-size: 14px;
-      font-weight: 700;
-      color: #fff;
-    }
-    .stat-pill .stat-lbl {
-      font-size: 11px;
-      color: #555;
-    }
+    .stat-pill .stat-num { font-size: 14px; font-weight: 700; color: #fff; }
+    .stat-pill .stat-lbl { font-size: 11px; color: #555; }
     .stat-pill.bullish .stat-num { color: #00c853; }
     .stat-pill.bearish .stat-num { color: #f44336; }
-
-    /* Running indicator */
     .running-bar {
       display: none;
       background: rgba(26,86,219,0.1);
@@ -128,7 +116,6 @@
 
 <div id="pipeline-page">
 
-  <!-- Header -->
   <div class="pipeline-header">
     <div class="pipeline-top-bar">
       <div class="pipeline-left">
@@ -142,11 +129,7 @@
       </div>
       <button class="run-btn" id="run-btn" onclick="triggerPipeline()">▶ Run Now</button>
     </div>
-
-    <!-- Stock tabs -->
     <div class="stock-tabs" id="stock-tabs"></div>
-
-    <!-- Sentiment filters -->
     <div class="sentiment-filters">
       <button class="sentiment-btn bullish" onclick="filterBySentiment('BULLISH')">Bullish</button>
       <button class="sentiment-btn bearish" onclick="filterBySentiment('BEARISH')">Bearish</button>
@@ -154,12 +137,10 @@
     </div>
   </div>
 
-  <!-- Running indicator -->
   <div class="running-bar" id="running-bar">
     <span class="running-dot"></span> Pipeline is running — fetching and tagging news...
   </div>
 
-  <!-- Stats bar -->
   <div class="stats-bar">
     <div class="stat-pill">
       <span class="stat-num" id="stat-total">—</span>
@@ -179,14 +160,12 @@
     </div>
   </div>
 
-  <!-- News grid -->
   <main id="news-grid" class="news-grid">
     <div class="loading">Hit ▶ Run Now to fetch news from the test pipeline.</div>
   </main>
 
 </div>
 
-<!-- Add stock modal search -->
 <div class="search-wrap" id="search-wrap" style="display:none; position:fixed; top:0; left:0; right:0; z-index:200; padding:12px 16px; background:#000; border-bottom:1px solid #1a1a1a;">
   <div class="search-inner">
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="2.5" style="flex-shrink:0">
@@ -203,7 +182,7 @@
 </div>
 
 <script>
-  const API_BASE = '/api';
+  const API_BASE = '';
   const token = localStorage.getItem('token');
   if (!token) window.location.href = '/';
 
@@ -254,14 +233,12 @@
     return `${Math.floor(diff / 86400)}d ago`;
   }
 
-  // ── Fetch status ──────────────────────────────────────────────────────
   async function fetchStatus() {
     try {
-      const res = await fetch(`${API_BASE}/pipeline2/status`, { headers: authHeaders() });
+      const res = await fetch(`/api/pipeline2/status`, { headers: authHeaders() });
       if (!res.ok) return;
       const data = await res.json();
 
-      // Update running bar
       const runningBar = document.getElementById('running-bar');
       const runBtn = document.getElementById('run-btn');
       if (data.isRunning) {
@@ -274,34 +251,27 @@
         runBtn.textContent = '▶ Run Now';
       }
 
-      // Stats
       document.getElementById('stat-total').textContent   = data.totalArticles ?? '—';
       document.getElementById('stat-bullish').textContent = data.bullishCount ?? '—';
       document.getElementById('stat-bearish').textContent = data.bearishCount ?? '—';
       document.getElementById('stat-updated').textContent = timeAgo(data.lastUpdated) || '—';
 
-      // Store articles and render
       if (data.articles && data.articles.length > 0) {
         allArticles = data.articles;
         renderNews();
       }
-
     } catch (e) {
       console.error('Status fetch failed:', e.message);
     }
   }
 
-  // ── Render news cards — same style as main app ────────────────────────
   function renderNews() {
     const grid = document.getElementById('news-grid');
     let news = allArticles;
 
-    // Filter by ticker
     if (currentTicker !== 'all') {
       news = news.filter(a => a.ticker === currentTicker);
     }
-
-    // Filter by sentiment
     if (currentSentiment !== 'all') {
       news = news.filter(a => a.sentiment === currentSentiment);
     }
@@ -334,7 +304,6 @@
     }).join('');
   }
 
-  // ── Stock tabs ────────────────────────────────────────────────────────
   function renderStockTabs() {
     const container = document.getElementById('stock-tabs');
     const tickerTabs = trackedTickers.map(t => `
@@ -365,7 +334,6 @@
     renderNews();
   }
 
-  // ── Add stock ─────────────────────────────────────────────────────────
   function openAddStock() {
     document.getElementById('search-wrap').style.display = 'block';
     setTimeout(() => document.getElementById('stock-search').focus(), 100);
@@ -410,12 +378,11 @@
     showToast(`${symbol} added — run pipeline to fetch news`);
   }
 
-  // ── Trigger pipeline ──────────────────────────────────────────────────
   async function triggerPipeline() {
     try {
       document.getElementById('run-btn').disabled = true;
       document.getElementById('run-btn').textContent = 'Running...';
-      const res = await fetch(`${API_BASE}/pipeline2/run`, {
+      const res = await fetch(`/api/pipeline2/run`, {
         method: 'POST', headers: authHeaders()
       });
       const data = await res.json();
@@ -429,7 +396,6 @@
     }
   }
 
-  // ── Init ──────────────────────────────────────────────────────────────
   renderStockTabs();
   fetchStatus();
   setInterval(fetchStatus, 5000);
