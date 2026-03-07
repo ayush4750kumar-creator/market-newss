@@ -9,6 +9,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css" />
   <style>
+    /* ── Extra styles only for pipeline2 page ── */
     .pipeline-header {
       background: #000;
       border-bottom: 1px solid #1a1a1a;
@@ -63,6 +64,7 @@
     .run-btn:hover { background: #1e40af; }
     .run-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
+    /* Stats bar */
     .stats-bar {
       display: flex;
       gap: 8px;
@@ -83,11 +85,19 @@
       align-items: center;
       gap: 6px;
     }
-    .stat-pill .stat-num { font-size: 14px; font-weight: 700; color: #fff; }
-    .stat-pill .stat-lbl { font-size: 11px; color: #555; }
+    .stat-pill .stat-num {
+      font-size: 14px;
+      font-weight: 700;
+      color: #fff;
+    }
+    .stat-pill .stat-lbl {
+      font-size: 11px;
+      color: #555;
+    }
     .stat-pill.bullish .stat-num { color: #00c853; }
     .stat-pill.bearish .stat-num { color: #f44336; }
 
+    /* Running indicator */
     .running-bar {
       display: none;
       background: rgba(26,86,219,0.1);
@@ -107,28 +117,8 @@
       margin-right: 6px;
       animation: pulse 1s ease-in-out infinite;
     }
-    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
-
-    /* ── AI summary box ── */
-    .card-ai-summary {
-      background: #0a0a0a;
-      border: 1px solid #1e1e1e;
-      border-radius: 8px;
-      padding: 10px 12px;
-      margin: 8px 0;
-      font-size: 13px;
-      line-height: 1.6;
-      color: #aaa;
-      font-style: italic;
-    }
-    .card-ai-label {
-      font-size: 9px;
-      font-weight: 700;
-      letter-spacing: 0.08em;
-      color: #1a56db;
-      text-transform: uppercase;
-      margin-bottom: 4px;
-      font-style: normal;
+    @keyframes pulse {
+      0%, 100% { opacity: 1; } 50% { opacity: 0.3; }
     }
   </style>
 </head>
@@ -138,6 +128,7 @@
 
 <div id="pipeline-page">
 
+  <!-- Header -->
   <div class="pipeline-header">
     <div class="pipeline-top-bar">
       <div class="pipeline-left">
@@ -151,7 +142,11 @@
       </div>
       <button class="run-btn" id="run-btn" onclick="triggerPipeline()">▶ Run Now</button>
     </div>
+
+    <!-- Stock tabs -->
     <div class="stock-tabs" id="stock-tabs"></div>
+
+    <!-- Sentiment filters -->
     <div class="sentiment-filters">
       <button class="sentiment-btn bullish" onclick="filterBySentiment('BULLISH')">Bullish</button>
       <button class="sentiment-btn bearish" onclick="filterBySentiment('BEARISH')">Bearish</button>
@@ -159,10 +154,12 @@
     </div>
   </div>
 
+  <!-- Running indicator -->
   <div class="running-bar" id="running-bar">
-    <span class="running-dot"></span> Pipeline running — scraping articles and generating AI summaries...
+    <span class="running-dot"></span> Pipeline is running — fetching and tagging news...
   </div>
 
+  <!-- Stats bar -->
   <div class="stats-bar">
     <div class="stat-pill">
       <span class="stat-num" id="stat-total">—</span>
@@ -182,12 +179,14 @@
     </div>
   </div>
 
+  <!-- News grid -->
   <main id="news-grid" class="news-grid">
     <div class="loading">Hit ▶ Run Now to fetch news from the test pipeline.</div>
   </main>
 
 </div>
 
+<!-- Add stock modal search -->
 <div class="search-wrap" id="search-wrap" style="display:none; position:fixed; top:0; left:0; right:0; z-index:200; padding:12px 16px; background:#000; border-bottom:1px solid #1a1a1a;">
   <div class="search-inner">
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="2.5" style="flex-shrink:0">
@@ -204,7 +203,7 @@
 </div>
 
 <script>
-  const API_BASE = '';
+  const API_BASE = 'https://market-newss-production.up.railway.app';
   const token = localStorage.getItem('token');
   if (!token) window.location.href = '/';
 
@@ -255,12 +254,14 @@
     return `${Math.floor(diff / 86400)}d ago`;
   }
 
+  // ── Fetch status ──────────────────────────────────────────────────────
   async function fetchStatus() {
     try {
-      const res = await fetch(`/api/pipeline2/status`, { headers: authHeaders() });
+      const res = await fetch(`${API_BASE}/api/pipeline2/status`, { headers: authHeaders() });
       if (!res.ok) return;
       const data = await res.json();
 
+      // Update running bar
       const runningBar = document.getElementById('running-bar');
       const runBtn = document.getElementById('run-btn');
       if (data.isRunning) {
@@ -273,26 +274,37 @@
         runBtn.textContent = '▶ Run Now';
       }
 
+      // Stats
       document.getElementById('stat-total').textContent   = data.totalArticles ?? '—';
       document.getElementById('stat-bullish').textContent = data.bullishCount ?? '—';
       document.getElementById('stat-bearish').textContent = data.bearishCount ?? '—';
       document.getElementById('stat-updated').textContent = timeAgo(data.lastUpdated) || '—';
 
+      // Store articles and render
       if (data.articles && data.articles.length > 0) {
         allArticles = data.articles;
         renderNews();
       }
+
     } catch (e) {
       console.error('Status fetch failed:', e.message);
     }
   }
 
+  // ── Render news cards — same style as main app ────────────────────────
   function renderNews() {
     const grid = document.getElementById('news-grid');
     let news = allArticles;
 
-    if (currentTicker !== 'all') news = news.filter(a => a.ticker === currentTicker);
-    if (currentSentiment !== 'all') news = news.filter(a => a.sentiment === currentSentiment);
+    // Filter by ticker
+    if (currentTicker !== 'all') {
+      news = news.filter(a => a.ticker === currentTicker);
+    }
+
+    // Filter by sentiment
+    if (currentSentiment !== 'all') {
+      news = news.filter(a => a.sentiment === currentSentiment);
+    }
 
     if (news.length === 0) {
       grid.innerHTML = '<div class="loading">No articles yet — hit ▶ Run Now to fetch news.</div>';
@@ -300,18 +312,8 @@
     }
 
     grid.innerHTML = news.map(item => {
-      const sentiment      = (item.sentiment || 'neutral').toLowerCase();
+      const sentiment = (item.sentiment || 'neutral').toLowerCase();
       const sentimentLabel = sentiment === 'bullish' ? 'Bullish' : sentiment === 'bearish' ? 'Bearish' : 'Neutral';
-
-      // Only show summary box if summary is different from headline
-      const hasSummary = item.summary && item.summary.trim() !== item.headline.trim();
-      const summaryBox = hasSummary
-        ? `<div class="card-ai-summary">
-             <div class="card-ai-label">✦ AI Summary</div>
-             ${item.summary}
-           </div>`
-        : '';
-
       return `
       <div class="news-card ${sentiment}">
         <div class="card-body">
@@ -324,19 +326,21 @@
             onclick="${item.source_url ? `window.open('${item.source_url}','_blank')` : ''}"
             style="${item.source_url ? 'cursor:pointer' : ''}"
           >${item.headline || ''}</div>
-          ${summaryBox}
+          <div class="card-story">${item.summary || 'Real-time signal from test pipeline.'}</div>
           <div class="sentiment-tag ${sentiment}">${sentimentLabel}</div>
-          <div class="card-source">${item.source || 'MarketPulse Pipeline'}${item.source_url ? ` · <a href="${item.source_url}" target="_blank" style="color:#1a56db;text-decoration:none">Read →</a>` : ''}</div>
+          <div class="card-source">${item.source || 'MarketPulse Test Pipeline'}${item.source_url ? ` · <a href="${item.source_url}" target="_blank" style="color:#1a56db;text-decoration:none">Read →</a>` : ''}</div>
         </div>
       </div>`;
     }).join('');
   }
 
+  // ── Stock tabs ────────────────────────────────────────────────────────
   function renderStockTabs() {
     const container = document.getElementById('stock-tabs');
     const tickerTabs = trackedTickers.map(t => `
       <button class="tab ${currentTicker === t ? 'active' : ''}" onclick="filterByTicker('${t}')">${t}</button>
     `).join('');
+
     container.innerHTML = `
       <button class="tab ${currentTicker === 'all' ? 'active' : ''}" onclick="filterByTicker('all')">All</button>
       ${tickerTabs}
@@ -361,6 +365,7 @@
     renderNews();
   }
 
+  // ── Add stock ─────────────────────────────────────────────────────────
   function openAddStock() {
     document.getElementById('search-wrap').style.display = 'block';
     setTimeout(() => document.getElementById('stock-search').focus(), 100);
@@ -376,9 +381,11 @@
     const val = document.getElementById('stock-search').value.trim().toUpperCase();
     const container = document.getElementById('suggestions');
     if (!val) { container.innerHTML = ''; return; }
+
     const matches = STOCK_SUGGESTIONS.filter(s =>
       s.symbol.startsWith(val) || s.name.toUpperCase().includes(val)
     ).slice(0, 5);
+
     const addNew = `<div class="suggestion-item" onclick="addTicker('${val}')">➕ Add "${val}" <span>new</span></div>`;
     const options = matches.map(s =>
       `<div class="suggestion-item" onclick="addTicker('${s.symbol}')">${s.symbol} <span>${s.name}</span></div>`
@@ -394,18 +401,23 @@
   }
 
   function addTicker(symbol) {
-    if (!trackedTickers.includes(symbol)) trackedTickers.push(symbol);
+    if (!trackedTickers.includes(symbol)) {
+      trackedTickers.push(symbol);
+    }
     currentTicker = symbol;
     closeSearch();
     renderStockTabs();
     showToast(`${symbol} added — run pipeline to fetch news`);
   }
 
+  // ── Trigger pipeline ──────────────────────────────────────────────────
   async function triggerPipeline() {
     try {
       document.getElementById('run-btn').disabled = true;
       document.getElementById('run-btn').textContent = 'Running...';
-      const res = await fetch(`/api/pipeline2/run`, { method: 'POST', headers: authHeaders() });
+      const res = await fetch(`${API_BASE}/api/pipeline2/run`, {
+        method: 'POST', headers: authHeaders()
+      });
       const data = await res.json();
       showToast(data.message || 'Pipeline triggered ✓');
       document.getElementById('running-bar').classList.add('show');
@@ -417,6 +429,7 @@
     }
   }
 
+  // ── Init ──────────────────────────────────────────────────────────────
   renderStockTabs();
   fetchStatus();
   setInterval(fetchStatus, 5000);
