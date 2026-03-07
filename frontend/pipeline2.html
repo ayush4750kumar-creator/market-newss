@@ -423,7 +423,7 @@
       document.getElementById('running-bar').classList.add('show');
       setTimeout(fetchStatus, 2000);
     } catch (e) {
-      showToast('Could not trigger pipeline');
+      showToast('Error: ' + e.message);
       document.getElementById('run-btn').disabled = false;
       document.getElementById('run-btn').textContent = '▶ Run Now';
     }
