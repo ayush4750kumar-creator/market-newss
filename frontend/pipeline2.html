@@ -10,6 +10,54 @@
   <link rel="stylesheet" href="styles.css" />
   <style>
     /* ── Extra styles only for pipeline2 page ── */
+
+  /* Card image */
+  .card-image {
+    width: 100%;
+    height: 180px;
+    object-fit: cover;
+    display: block;
+    background: #e0ddd8;
+  }
+  .card-image-placeholder {
+    width: 100%;
+    height: 140px;
+    background: linear-gradient(135deg, #e8e4df 0%, #d4d0cb 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 32px;
+  }
+
+  /* Expandable summary */
+  .card-summary-short {
+    font-size: 14px;
+    color: #555;
+    line-height: 1.7;
+    margin-bottom: 8px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .card-summary-full {
+    font-size: 14px;
+    color: #555;
+    line-height: 1.7;
+    margin-bottom: 8px;
+    display: none;
+  }
+  .card-more-btn {
+    background: none;
+    border: none;
+    color: #1a56db;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 0;
+    margin-bottom: 8px;
+    font-family: 'Inter', sans-serif;
+  }
     .pipeline-header {
       background: #000;
       border-bottom: 1px solid #1a1a1a;
@@ -326,7 +374,14 @@
             onclick="${item.source_url ? `window.open('${item.source_url}','_blank')` : ''}"
             style="${item.source_url ? 'cursor:pointer' : ''}"
           >${item.headline || ''}</div>
-          <div class="card-story">${item.summary || 'Real-time signal from test pipeline.'}</div>
+        </div>
+        ${item.image_url ? `<img class="card-image" src="${item.image_url}" onerror="this.style.display='none'" loading="lazy" />` : `<div class="card-image-placeholder">${sentiment === 'bullish' ? '📈' : sentiment === 'bearish' ? '📉' : '📊'}</div>`}
+        <div class="card-body" style="padding-top:10px">
+          ${item.summary ? `
+          <div class="card-summary-short" id="short-${item.id}">${item.summary}</div>
+          <div class="card-summary-full" id="full-${item.id}">${item.summary}</div>
+          <button class="card-more-btn" onclick="toggleSummary('${item.id}', this)">More ↓</button>
+          ` : ''}
           <div class="sentiment-tag ${sentiment}">${sentimentLabel}</div>
           <div class="card-source">${item.source || 'MarketPulse Test Pipeline'}${item.source_url ? ` · <a href="${item.source_url}" target="_blank" style="color:#1a56db;text-decoration:none">Read →</a>` : ''}</div>
         </div>
@@ -430,6 +485,21 @@
       showToast('Error: ' + e.message);
       document.getElementById('run-btn').disabled = false;
       document.getElementById('run-btn').textContent = '▶ Run Now';
+    }
+  }
+
+  // ── Toggle summary expand ─────────────────────────────────────────────
+  function toggleSummary(id, btn) {
+    const short = document.getElementById('short-' + id);
+    const full  = document.getElementById('full-' + id);
+    if (full.style.display === 'block') {
+      full.style.display = 'none';
+      short.style.display = '-webkit-box';
+      btn.textContent = 'More ↓';
+    } else {
+      full.style.display = 'block';
+      short.style.display = 'none';
+      btn.textContent = 'Less ↑';
     }
   }
 

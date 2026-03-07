@@ -53,8 +53,8 @@ async function runTestPipeline(tickers = DEFAULT_TICKERS) {
         const rawHeadline = a.title || a.headline || '';
         const ticker = a.stock || 'GLOBAL';
         const newHeadline = await rewriteHeadline(rawHeadline, ticker);
-        const { summary, sentiment, confidence } = await runAgentSummary(a, newHeadline);
-        return { id: a.id, ticker, headline: newHeadline, summary, source: (a.source || 'Google News').replace('Google News: ', ''), source_url: a.url || null, sentiment, confidence, published_at: a.publishedAt || new Date().toISOString() };
+        const { summary, sentiment, confidence, image_url } = await runAgentSummary(a, newHeadline);
+        return { id: a.id, ticker, headline: newHeadline, summary, image_url, source: (a.source || 'Google News').replace('Google News: ', ''), source_url: a.url || null, sentiment, confidence, published_at: a.publishedAt || new Date().toISOString() };
       }));
       processed.push(...results);
       if (i + 2 < toProcess.length) await new Promise(r => setTimeout(r, 1500));
