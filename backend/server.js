@@ -146,6 +146,7 @@ async function runMiniPipeline(symbol) {
 
 // Auth routes
 app.use('/api/auth', authRouter);
+app.use('/api/pipeline2', require('./routes/pipeline2').router);
 
 // News routes
 app.get('/api/news', (req, res) => {
