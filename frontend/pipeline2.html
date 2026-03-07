@@ -257,7 +257,7 @@
   // ── Fetch status ──────────────────────────────────────────────────────
   async function fetchStatus() {
     try {
-      const res = await fetch(`${API_BASE}/api/pipeline2/status`, { headers: authHeaders() });
+      const res = await fetch(`${API_BASE}/api/pipeline2/status`);
       if (!res.ok) return;
       const data = await res.json();
 
@@ -416,7 +416,7 @@
       document.getElementById('run-btn').disabled = true;
       document.getElementById('run-btn').textContent = 'Running...';
       const res = await fetch(`${API_BASE}/api/pipeline2/run`, {
-        method: 'POST', headers: authHeaders(), body: JSON.stringify({})
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({})
       });
       const data = await res.json();
       showToast(data.message || 'Pipeline triggered ✓');

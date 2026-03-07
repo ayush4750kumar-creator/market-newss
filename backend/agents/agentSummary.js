@@ -24,7 +24,7 @@ async function runAgentSummary(article, newHeadline) {
     const res = await axios.post(
       'https://api.groq.com/openai/v1/chat/completions',
       {
-        model: 'llama-3.1-8b-instant',
+        model: 'gemma2-9b-it',
         max_tokens: 100,
         temperature: 0.3,
         messages: [
