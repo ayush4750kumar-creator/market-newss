@@ -5,9 +5,14 @@ async function fetchArticleData(url) {
   if (!url) return { text: null, image: null };
   try {
     const res = await axios.get(url, {
-      timeout: 6000,
-      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36', 'Accept': 'text/html' },
-      maxRedirects: 5,
+      timeout: 8000,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Cache-Control': 'no-cache',
+      },
+      maxRedirects: 10,
     });
     const html = res.data || '';
     // Extract og:image or twitter:image
