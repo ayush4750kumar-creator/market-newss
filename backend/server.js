@@ -8,6 +8,7 @@ const { runAgentA } = require('./agents/agentA');
 const { runAgentB } = require('./agents/agentB');
 const { initDB, pool, saveNews, loadNews } = require('./services/database');
 const { router: authRouter } = require('./routes/auth');
+const { router: pipeline2Router } = require('./routes/pipeline2'); // ← NEW
 
 const app = express();
 app.use(cors());
@@ -24,7 +25,6 @@ let newsStore = {
 
 let trackedStocks = [...config.DEFAULT_STOCKS];
 
-// ✅ Rebuild newsStore.all from stock + global — no duplicates
 function rebuildAll() {
   const stockNews = Object.values(newsStore.byStock).flat();
   const allNews = [...newsStore.global, ...stockNews];
@@ -46,14 +46,13 @@ async function loadAllUserStocks() {
   }
 }
 
-// ✅ Load saved news from DB and prime dedup cache
 async function loadNewsFromDB() {
   try {
     const articles = await loadNews();
     if (articles.length === 0) return;
 
     const { filterNew } = require('./services/dedup');
-    filterNew(articles); // prime dedup cache with existing IDs
+    filterNew(articles);
 
     articles.forEach(item => {
       if (item.stock) {
@@ -72,7 +71,6 @@ async function loadNewsFromDB() {
   }
 }
 
-// ✅ Main pipeline — stock news only (global handled separately)
 async function runPipeline() {
   if (newsStore.isRunning) return;
   newsStore.isRunning = true;
@@ -111,7 +109,6 @@ async function runPipeline() {
   }
 }
 
-// ✅ Global news pipeline — runs every 3 minutes
 let globalIsRunning = false;
 async function runGlobalPipeline() {
   if (globalIsRunning) return;
@@ -130,7 +127,6 @@ async function runGlobalPipeline() {
     const isGlobalEmpty = newsStore.global.length === 0;
     const newArticles = isGlobalEmpty ? articles : filterNew(articles);
 
-    console.log(`[Global Pipeline] ${newArticles.length} new articles${isGlobalEmpty ? ' (dedup bypassed)' : ''}`);
     if (newArticles.length === 0) return;
 
     const categorized = await runAgentA(newArticles);
@@ -148,7 +144,6 @@ async function runGlobalPipeline() {
   }
 }
 
-// ✅ Mini pipeline — full Agent A + B, bypasses dedup for new stocks
 async function runMiniPipeline(symbol) {
   console.log(`[Mini Pipeline] Starting for ${symbol}...`);
   try {
@@ -159,18 +154,11 @@ async function runMiniPipeline(symbol) {
     const isNewStock = newsStore.byStock[symbol].length === 0;
 
     const articles = await fetchFinnhubStock(symbol);
-    if (!articles || articles.length === 0) {
-      console.log(`[Mini Pipeline] No articles found for ${symbol}`);
-      return;
-    }
+    if (!articles || articles.length === 0) return;
 
     const newArticles = isNewStock ? articles : filterNew(articles);
-    if (newArticles.length === 0) {
-      console.log(`[Mini Pipeline] No new articles for ${symbol}`);
-      return;
-    }
+    if (newArticles.length === 0) return;
 
-    // Enrich with full article content
     const limited = newArticles.slice(0, 5);
     const enriched = await Promise.all(limited.map(async a => {
       const content = await fetchArticleContent(a.url);
@@ -178,7 +166,6 @@ async function runMiniPipeline(symbol) {
       return a;
     }));
 
-    console.log(`[Mini Pipeline] Running Agent A + B for ${symbol}...`);
     const categorized = await runAgentA(enriched);
     const published = await runAgentB(categorized);
 
@@ -192,10 +179,11 @@ async function runMiniPipeline(symbol) {
   }
 }
 
-// Auth routes
-app.use('/api/auth', authRouter);
+// ── Routes ──────────────────────────────────────────────────────────────────
 
-// News routes
+app.use('/api/auth', authRouter);
+app.use('/api/pipeline2', pipeline2Router); // ← NEW — test pipeline route
+
 app.get('/api/news', (req, res) => {
   const { sentiment, stock, limit = 50 } = req.query;
   let news = stock ? (newsStore.byStock[stock] || []) : newsStore.all;
@@ -250,6 +238,8 @@ app.get('/api/status', (req, res) => {
   });
 });
 
+// ── Start ────────────────────────────────────────────────────────────────────
+
 initDB().then(async () => {
   await loadNewsFromDB();
 
@@ -258,13 +248,11 @@ initDB().then(async () => {
     runPipeline();
     runGlobalPipeline();
 
-    // Stock news every 15 minutes
     cron.schedule(`*/${config.REFRESH_INTERVAL} * * * *`, () => {
       console.log('[Cron] Stock pipeline run...');
       runPipeline();
     });
 
-    // Global news every 3 minutes
     cron.schedule('*/3 * * * *', () => {
       console.log('[Cron] Global news refresh...');
       runGlobalPipeline();
