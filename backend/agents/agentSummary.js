@@ -1,5 +1,5 @@
 const axios  = require('axios');
-const config = require('../config');
+const GROQ_API_KEY = process.env.GROQ_API_KEY;
 
 async function fetchArticleText(url) {
   if (!url) return null;
@@ -18,7 +18,7 @@ async function runAgentSummary(article, newHeadline) {
   const url = article.url || article.source_url || null;
   const ticker = article.stock || 'GLOBAL';
   const articleText = await fetchArticleText(url);
-  if (!config.GROQ_API_KEY) return { summary: null, sentiment: 'NEUTRAL', confidence: 70 };
+  if (!GROQ_API_KEY) return { summary: null, sentiment: 'NEUTRAL', confidence: 70 };
   const context = articleText ? `Headline: "${newHeadline}"\n\nArticle text:\n${articleText}` : `Headline: "${newHeadline}"`;
   try {
     const res = await axios.post(
@@ -32,7 +32,7 @@ async function runAgentSummary(article, newHeadline) {
           { role: 'user', content: `Stock: ${ticker}\n${context}\n\nReturn JSON:\n{\n  "summary": "2-3 sentences. What happened. Why it matters for the stock. What to watch next. Simple English. No jargon. No source names.",\n  "sentiment": "BULLISH" or "BEARISH" or "NEUTRAL",\n  "confidence": 0-100\n}\nReturn only JSON.` },
         ],
       },
-      { headers: { Authorization: `Bearer ${config.GROQ_API_KEY}`, 'Content-Type': 'application/json' } }
+      { headers: { Authorization: `Bearer ${GROQ_API_KEY}`, 'Content-Type': 'application/json' } }
     );
     const raw = res.data.choices[0].message.content.trim();
     const parsed = JSON.parse(raw.replace(/```json|```/g, '').trim());
