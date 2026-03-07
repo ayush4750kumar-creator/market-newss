@@ -16,7 +16,7 @@ async function rewriteHeadline(rawHeadline, ticker) {
     const res = await axios.post(
       'https://api.groq.com/openai/v1/chat/completions',
       {
-        model: 'llama-3.3-70b-versatile',
+        model: 'llama-3.1-8b-instant',
         max_tokens: 40,
         temperature: 0.4,
         messages: [

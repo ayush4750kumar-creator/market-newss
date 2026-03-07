@@ -24,8 +24,8 @@ async function runAgentSummary(article, newHeadline) {
     const res = await axios.post(
       'https://api.groq.com/openai/v1/chat/completions',
       {
-        model: 'llama-3.3-70b-versatile',
-        max_tokens: 180,
+        model: 'llama-3.1-8b-instant',
+        max_tokens: 100,
         temperature: 0.3,
         messages: [
           { role: 'system', content: 'You are a financial writer for beginner Indian retail investors. Always respond with valid JSON only.' },
