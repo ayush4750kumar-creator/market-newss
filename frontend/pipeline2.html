@@ -203,7 +203,7 @@
 </div>
 
 <script>
-  const API_BASE = 'https://market-newss-production.up.railway.app';
+  const API_BASE = '/api';
   const token = localStorage.getItem('token');
   if (!token) window.location.href = '/';
 
@@ -257,7 +257,7 @@
   // ── Fetch status ──────────────────────────────────────────────────────
   async function fetchStatus() {
     try {
-      const res = await fetch(`${API_BASE}/api/pipeline2/status`, { headers: authHeaders() });
+      const res = await fetch(`${API_BASE}/pipeline2/status`, { headers: authHeaders() });
       if (!res.ok) return;
       const data = await res.json();
 
@@ -415,7 +415,7 @@
     try {
       document.getElementById('run-btn').disabled = true;
       document.getElementById('run-btn').textContent = 'Running...';
-      const res = await fetch(`${API_BASE}/api/pipeline2/run`, {
+      const res = await fetch(`${API_BASE}/pipeline2/run`, {
         method: 'POST', headers: authHeaders()
       });
       const data = await res.json();

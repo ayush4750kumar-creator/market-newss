@@ -1,4 +1,4 @@
-const API_BASE = 'https://market-newss-production.up.railway.app';
+const API_BASE = '/api';
 
 let currentStock = 'global';
 let currentSentiment = 'all';
