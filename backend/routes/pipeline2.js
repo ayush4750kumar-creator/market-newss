@@ -1,9 +1,9 @@
 // Mounted at /api/pipeline2 in server.js
 
-const express            = require('express');
-const router             = express.Router();
+const express             = require('express');
+const router              = express.Router();
 const { fetchFinnhubStock } = require('../services/newsFetcher');
-const { authenticate }   = require('./auth');
+const { authenticate }    = require('./auth');
 const { runAgentScraper } = require('../agents/agentScraper');
 
 // ── In-memory state ───────────────────────────────────────────────────────
@@ -18,12 +18,7 @@ let state = {
 };
 
 function resetState() {
-  state.articles      = [];
-  state.totalArticles = 0;
-  state.bullishCount  = 0;
-  state.bearishCount  = 0;
-  state.lastUpdated   = null;
-  state.logs          = [];
+  state = { isRunning: false, lastUpdated: null, articles: [], totalArticles: 0, bullishCount: 0, bearishCount: 0, logs: [] };
   console.log('[Pipeline2] State reset ✓');
 }
 
@@ -40,7 +35,7 @@ function dedupByHeadline(articles) {
     const key = (a.title || a.headline || '')
       .toLowerCase()
       .replace(/[^a-z0-9]/g, '')
-      .slice(0, 50);
+      .slice(0, 55);
     if (!key || seen.has(key)) return false;
     seen.add(key);
     return true;
@@ -61,62 +56,51 @@ async function runTestPipeline(tickers = DEFAULT_TICKERS) {
   try {
     const allRaw = [];
 
-    // Step 1 — fetch news
-    addLog('Fetching from Google News RSS...');
+    // Step 1 — fetch
+    addLog('Fetching news...');
     for (const ticker of tickers) {
       const articles = await fetchFinnhubStock(ticker);
       allRaw.push(...articles);
       await new Promise(r => setTimeout(r, 200));
     }
 
-    // Step 2 — dedup by ID
+    // Step 2 — dedup by ID then headline
     const existingIds = new Set(state.articles.map(a => a.id));
     const freshById   = allRaw.filter(a => !existingIds.has(a.id));
-
-    // Step 3 — dedup by similar headline
-    const fresh = dedupByHeadline(freshById);
+    const fresh       = dedupByHeadline(freshById);
     addLog(`${fresh.length} unique new articles after dedup`);
 
     if (fresh.length === 0) {
-      addLog('No new articles — all already seen ✓');
+      addLog('No new articles ✓');
       state.lastUpdated = new Date().toISOString();
       state.isRunning   = false;
       return;
     }
 
-    // Step 4 — scrape + summarize in batches of 3
-    addLog('Scraping articles and generating AI summaries...');
+    // Step 3 — scrape + AI process in batches of 3
+    addLog('Scraping and summarizing with AI...');
     const processed = [];
     const toProcess = fresh.slice(0, 30);
     const batchSize = 3;
 
     for (let i = 0; i < toProcess.length; i += batchSize) {
       const batch = toProcess.slice(i, i + batchSize);
-      addLog(`Scraping batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(toProcess.length / batchSize)}...`);
-
-      const batchResults = await Promise.all(
-        batch.map(a => runAgentScraper(a))
-      );
-      processed.push(...batchResults);
-
-      // 1s between batches to stay under Groq rate limits
-      if (i + batchSize < toProcess.length) {
-        await new Promise(r => setTimeout(r, 1000));
-      }
+      addLog(`Batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(toProcess.length / batchSize)}...`);
+      const results = await Promise.all(batch.map(a => runAgentScraper(a)));
+      processed.push(...results);
+      if (i + batchSize < toProcess.length) await new Promise(r => setTimeout(r, 1000));
     }
 
-    // Update state
     state.articles      = [...processed, ...state.articles].slice(0, 150);
     state.totalArticles = state.articles.length;
     state.bullishCount  = state.articles.filter(a => a.sentiment === 'BULLISH').length;
     state.bearishCount  = state.articles.filter(a => a.sentiment === 'BEARISH').length;
     state.lastUpdated   = new Date().toISOString();
 
-    addLog(`Done ✓ — ${processed.length} articles scraped and summarized`);
+    addLog(`Done ✓ — ${processed.length} articles processed`);
 
   } catch (err) {
     addLog(`Error: ${err.message}`);
-    console.error('[Pipeline2]', err);
   } finally {
     state.isRunning = false;
   }
