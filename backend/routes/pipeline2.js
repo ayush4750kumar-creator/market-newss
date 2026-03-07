@@ -3,6 +3,8 @@
 // Mounted at /api/pipeline2 in server.js
 
 const express = require('express');
+const OpenAI = require('openai');
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const router = express.Router();
 const { authenticate } = require('./auth');
 
@@ -70,6 +72,30 @@ function resolveTicker(text, fallback) {
     if (new RegExp(`\\b${name}\\b`, 'i').test(lower)) return ticker;
   }
   return fallback.replace('NSE:', '');
+}
+
+
+// ── Generate plain English summary ──────────────────────────────────────
+async function generateSummary(headline, ticker) {
+  try {
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      max_tokens: 50,
+      messages: [
+        {
+          role: 'system',
+          content: 'Write one sentence (max 20 words) explaining what this stock news means for a retail investor in plain English. No jargon. Example: "Company beat earnings expectations — stock likely to rise short term."'
+        },
+        {
+          role: 'user',
+          content: `Stock: ${ticker}\nHeadline: "${headline}"`
+        }
+      ]
+    });
+    return response.choices[0].message.content.trim();
+  } catch {
+    return null;
+  }
 }
 
 // ── Core pipeline ─────────────────────────────────────────────────────────
@@ -150,7 +176,7 @@ async function runTestPipeline() {
         source_id:    String(a.id),
         ticker,
         headline:     a.headline,
-        summary:      null,
+        summary:      await generateSummary(a.headline, ticker),
         source:       a.source || null,
         source_url:   a.url || null,
         sentiment,
