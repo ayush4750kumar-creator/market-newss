@@ -38,6 +38,7 @@ async function runAgentSummary(article, newHeadline) {
     const parsed = JSON.parse(raw.replace(/```json|```/g, '').trim());
     return { summary: parsed.summary || null, sentiment: (parsed.sentiment || 'NEUTRAL').toUpperCase(), confidence: parsed.confidence || 70 };
   } catch (err) {
+    console.error('[AgentSummary] Groq error:', err.response?.status, err.response?.data?.error?.message || err.message);
     if (err.response?.status === 429) await new Promise(r => setTimeout(r, 8000));
     const lower = newHeadline.toLowerCase();
     const bearish = ['falls','drops','plunges','declines','cuts','misses','downgrade','loss','warning','crash','sink','risk','down'];
