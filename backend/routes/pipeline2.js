@@ -24,6 +24,32 @@ function addLog(msg) {
   if (state.logs.length > 100) state.logs.pop();
 }
 
+// ── Clean headline — strip "- Source Name" suffix ─────────────────────────
+function cleanHeadline(headline) {
+  if (!headline) return '';
+  // Remove " - Source Name" at end (e.g. "Tesla Rises - Yahoo Finance")
+  return headline
+    .replace(/\s[-–|]\s[^-–|]+$/, '')  // remove " - Source Name"
+    .replace(/\s*-\s*(Yahoo Finance|Reuters|Bloomberg|CNBC|Investopedia|Barron's|Forbes|Nasdaq|The Motley Fool|Barchart\.com|TradingView|Mint|AOL\.com|thestreet\.com|Investing\.com.*|24\/7 Wall St\.|The Globe and Mail|Investor's Business Daily|TechStock.*|Meyka|Trefis|Naître.*|Market Risk.*)$/i, '')
+    .trim();
+}
+
+// ── Deduplicate by similar headline text ──────────────────────────────────
+function dedupByHeadline(articles) {
+  const seen = new Set();
+  return articles.filter(a => {
+    // Normalize: lowercase, remove punctuation, take first 60 chars
+    const key = (a.title || a.headline || '')
+      .toLowerCase()
+      .replace(/[^a-z0-9 ]/g, '')
+      .slice(0, 60)
+      .trim();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 // ── Sentiment keyword fallback ────────────────────────────────────────────
 const BEARISH_WORDS = [
   'falls','fall','drops','drop','plunges','plunge','declines','decline',
@@ -73,11 +99,11 @@ Always respond with valid JSON only. No markdown, no extra text.`
             content: `Stock: ${ticker}
 Headline: "${headline}"
 
-Return JSON with:
+Return JSON:
 - sentiment: "BULLISH", "BEARISH", or "NEUTRAL"
 - confidence: number 0-100
-- summary: ONE simple sentence (max 20 words) explaining what this means for the stock. No jargon.
-- shortHeadline: rewrite headline in under 8 words, clear and punchy
+- summary: ONE simple sentence max 20 words explaining what this means for the stock. No jargon. No source names.
+- shortHeadline: max 8 words, clean punchy headline. Do NOT include source name like Yahoo Finance or Reuters.
 
 Example: {"sentiment":"BULLISH","confidence":88,"summary":"Strong earnings beat expectations — stock likely to rise.","shortHeadline":"Tesla Beats Earnings, Stock May Rise"}
 
@@ -99,14 +125,13 @@ Return only JSON.`
       sentiment:     (parsed.sentiment || 'NEUTRAL').toUpperCase(),
       confidence:    parsed.confidence || 70,
       summary:       parsed.summary || null,
-      shortHeadline: parsed.shortHeadline || headline.slice(0, 80),
+      shortHeadline: cleanHeadline(parsed.shortHeadline || headline),
     };
 
   } catch (err) {
-    // Rate limited — wait and retry once
     if (err.response?.status === 429) {
-      addLog('Rate limited by Groq, waiting 5s...');
-      await new Promise(r => setTimeout(r, 5000));
+      addLog('Rate limited by Groq, waiting 8s...');
+      await new Promise(r => setTimeout(r, 8000));
       try {
         const retry = await axios.post(
           'https://api.groq.com/openai/v1/chat/completions',
@@ -116,7 +141,7 @@ Return only JSON.`
             temperature: 0.2,
             messages: [
               { role: 'system', content: 'You are a financial analyst. Always respond with valid JSON only.' },
-              { role: 'user', content: `Stock: ${ticker}\nHeadline: "${headline}"\nReturn JSON: {"sentiment":"NEUTRAL","confidence":70,"summary":"Market update for ${ticker}.","shortHeadline":"${headline.slice(0,50)}"}` }
+              { role: 'user', content: `Stock: ${ticker}\nHeadline: "${headline}"\nReturn JSON: {"sentiment":"NEUTRAL","confidence":70,"summary":"Market update — check latest news for details.","shortHeadline":"${cleanHeadline(headline).slice(0, 50)}"}` }
             ]
           },
           { headers: { 'Authorization': `Bearer ${config.GROQ_API_KEY}`, 'Content-Type': 'application/json' } }
@@ -127,7 +152,7 @@ Return only JSON.`
           sentiment:     (parsed.sentiment || 'NEUTRAL').toUpperCase(),
           confidence:    parsed.confidence || 70,
           summary:       parsed.summary || null,
-          shortHeadline: parsed.shortHeadline || headline.slice(0, 80),
+          shortHeadline: cleanHeadline(parsed.shortHeadline || headline),
         };
       } catch {
         return null;
@@ -160,9 +185,12 @@ async function runTestPipeline(tickers = DEFAULT_TICKERS) {
       await new Promise(r => setTimeout(r, 200));
     }
 
-    // Step 2 — dedup
+    // Step 2 — dedup by ID
     const existingIds = new Set(state.articles.map(a => a.id));
-    const fresh = allRaw.filter(a => !existingIds.has(a.id));
+    const freshById = allRaw.filter(a => !existingIds.has(a.id));
+
+    // Step 3 — dedup by similar headline (removes same story from multiple sources)
+    const fresh = dedupByHeadline(freshById);
     addLog(`${fresh.length} new articles after dedup`);
 
     if (fresh.length === 0) {
@@ -172,7 +200,7 @@ async function runTestPipeline(tickers = DEFAULT_TICKERS) {
       return;
     }
 
-    // Step 3 — Groq AI analysis in batches of 3 (same as agentB)
+    // Step 4 — Groq AI in batches of 3
     addLog('Running Groq AI analysis...');
     const processed = [];
     const toProcess = fresh.slice(0, 40);
@@ -180,19 +208,19 @@ async function runTestPipeline(tickers = DEFAULT_TICKERS) {
 
     for (let i = 0; i < toProcess.length; i += batchSize) {
       const batch = toProcess.slice(i, i + batchSize);
-      addLog(`Batch ${Math.floor(i/batchSize)+1}/${Math.ceil(toProcess.length/batchSize)}...`);
+      addLog(`Batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(toProcess.length / batchSize)}...`);
 
       const batchResults = await Promise.all(batch.map(async (a) => {
-        const headline = a.title || a.headline || '';
-        const ticker   = a.stock || 'GLOBAL';
+        const rawHeadline = a.title || a.headline || '';
+        const headline    = cleanHeadline(rawHeadline);
+        const ticker      = a.stock || 'GLOBAL';
 
-        // Try Groq AI first, fall back to keyword matching
         const groq = await analyzeWithGroq(headline, ticker);
 
         return {
           id:           a.id,
           ticker,
-          headline:     groq?.shortHeadline || headline.slice(0, 80),
+          headline:     groq?.shortHeadline || headline,
           summary:      groq?.summary || a.summary || a.story || headline,
           source:       (a.source || 'Google News').replace('Google News: ', ''),
           source_url:   a.url || null,
@@ -204,9 +232,9 @@ async function runTestPipeline(tickers = DEFAULT_TICKERS) {
 
       processed.push(...batchResults);
 
-      // 800ms between batches — same as agentB to avoid rate limits
+      // 1s between batches to avoid rate limits
       if (i + batchSize < toProcess.length) {
-        await new Promise(r => setTimeout(r, 800));
+        await new Promise(r => setTimeout(r, 1000));
       }
     }
 
@@ -217,7 +245,7 @@ async function runTestPipeline(tickers = DEFAULT_TICKERS) {
     state.bearishCount  = state.articles.filter(a => a.sentiment === 'BEARISH').length;
     state.lastUpdated   = new Date().toISOString();
 
-    addLog(`Done ✓ — ${processed.length} articles processed with AI`);
+    addLog(`Done ✓ — ${processed.length} articles processed`);
 
   } catch (err) {
     addLog(`Error: ${err.message}`);
