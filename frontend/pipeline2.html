@@ -416,7 +416,7 @@
       document.getElementById('run-btn').disabled = true;
       document.getElementById('run-btn').textContent = 'Running...';
       const res = await fetch(`${API_BASE}/api/pipeline2/run`, {
-        method: 'POST', headers: authHeaders()
+        method: 'POST', headers: authHeaders(), body: JSON.stringify({})
       });
       const data = await res.json();
       showToast(data.message || 'Pipeline triggered ✓');
