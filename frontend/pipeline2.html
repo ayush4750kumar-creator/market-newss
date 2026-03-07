@@ -414,9 +414,13 @@
   async function triggerPipeline() {
     try {
       document.getElementById('run-btn').disabled = true;
+      document.getElementById('run-btn').textContent = 'Waking up...';
+      // Wake up Railway first
+      try { await fetch(`${API_BASE}/api/status`); } catch(e) {}
+      await new Promise(r => setTimeout(r, 2000));
       document.getElementById('run-btn').textContent = 'Running...';
       const res = await fetch(`${API_BASE}/api/pipeline2/run`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}), signal: AbortSignal.timeout(30000)
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({})
       });
       const data = await res.json();
       showToast(data.message || 'Pipeline triggered ✓');
