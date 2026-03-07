@@ -2,283 +2,241 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
   <title>Test Pipeline — MarketPulse</title>
-  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css" />
   <style>
-    :root {
-      --bg: #000;
-      --surface: #0d0d0d;
-      --surface2: #141414;
-      --border: #1e1e1e;
-      --green: #00e676;
-      --red: #f44336;
-      --blue: #1a56db;
-      --yellow: #ffd600;
-      --orange: #ff9100;
-      --text: #e8e8e8;
-      --muted: #555;
+    /* ── Extra styles only for pipeline2 page ── */
+    .pipeline-header {
+      background: #000;
+      border-bottom: 1px solid #1a1a1a;
+      padding: 12px 16px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
     }
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
-    body::before {
-      content: '';
-      position: fixed;
-      inset: 0;
-      background-image:
-        linear-gradient(rgba(0,230,118,0.02) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(0,230,118,0.02) 1px, transparent 1px);
-      background-size: 32px 32px;
-      pointer-events: none;
-      z-index: 0;
+    .pipeline-top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
     }
-    .page { position: relative; z-index: 1; max-width: 900px; margin: 0 auto; padding: 0 0 80px; }
-
-    /* Header */
-    .header {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 14px 16px;
-      background: rgba(0,0,0,0.9);
-      border-bottom: 1px solid var(--border);
-      position: sticky; top: 0; z-index: 100;
-      backdrop-filter: blur(10px);
+    .pipeline-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
     }
-    .header-left { display: flex; align-items: center; gap: 12px; }
     .back-btn {
-      display: flex; align-items: center; gap: 6px;
-      background: none; border: none; color: var(--blue);
-      font-size: 14px; font-weight: 600; cursor: pointer; padding: 6px 0;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      background: none;
+      border: none;
+      color: #1a56db;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      padding: 6px 0;
+      touch-action: manipulation;
     }
-    .page-title { font-family: 'Space Mono', monospace; font-size: 13px; font-weight: 700; color: #fff; letter-spacing: 1px; }
-    .badge { background: rgba(255,145,0,0.15); color: var(--orange); border: 1px solid rgba(255,145,0,0.3); border-radius: 6px; padding: 2px 8px; font-size: 10px; font-family: 'Space Mono', monospace; letter-spacing: 1px; }
+    .pipeline-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 22px;
+      font-weight: 700;
+      color: #fff;
+    }
     .run-btn {
-      background: var(--green); color: #000; border: none; border-radius: 8px;
-      padding: 9px 18px; font-size: 12px; font-weight: 700;
-      font-family: 'Space Mono', monospace; letter-spacing: 0.5px;
-      cursor: pointer; transition: opacity 0.2s;
+      background: #1a56db;
+      color: #fff;
+      border: none;
+      border-radius: 50px;
+      padding: 9px 20px;
+      font-size: 13px;
+      font-weight: 600;
+      font-family: 'Inter', sans-serif;
+      cursor: pointer;
+      transition: background 0.2s;
+      touch-action: manipulation;
     }
+    .run-btn:hover { background: #1e40af; }
     .run-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-    .run-btn:hover:not(:disabled) { opacity: 0.85; }
 
-    /* Status bar */
-    .status-bar {
-      display: flex; align-items: center; gap: 10px;
-      padding: 12px 16px; background: var(--surface);
-      border-bottom: 1px solid var(--border);
-      font-family: 'Space Mono', monospace; font-size: 11px;
+    /* Stats bar */
+    .stats-bar {
+      display: flex;
+      gap: 8px;
+      padding: 12px 16px;
+      background: #000;
+      border-bottom: 1px solid #1a1a1a;
+      overflow-x: auto;
+      scrollbar-width: none;
     }
-    .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex-shrink: 0; }
-    .status-dot.running { background: var(--green); animation: pulse 1s ease-in-out infinite; }
-    @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(0.8); } }
-    .status-text { color: var(--muted); }
-    .status-text strong { color: #fff; }
-
-    /* Stats */
-    .stats-grid {
-      display: grid; grid-template-columns: repeat(2, 1fr);
-      gap: 1px; background: var(--border); border-bottom: 1px solid var(--border);
+    .stats-bar::-webkit-scrollbar { display: none; }
+    .stat-pill {
+      background: #111;
+      border: 1px solid #1e1e1e;
+      border-radius: 50px;
+      padding: 6px 14px;
+      white-space: nowrap;
+      display: flex;
+      align-items: center;
+      gap: 6px;
     }
-    @media (min-width: 600px) { .stats-grid { grid-template-columns: repeat(4, 1fr); } }
-    .stat-card { background: var(--surface); padding: 20px 16px; text-align: center; }
-    .stat-value { font-family: 'Space Mono', monospace; font-size: 28px; font-weight: 700; color: #fff; margin-bottom: 4px; line-height: 1; }
-    .stat-label { font-size: 10px; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; }
-
-    /* Section */
-    .section { padding: 20px 16px 0; }
-    .section-title {
-      font-family: 'Space Mono', monospace; font-size: 10px;
-      letter-spacing: 2px; text-transform: uppercase; color: var(--muted);
-      margin-bottom: 12px; display: flex; align-items: center; gap: 10px;
+    .stat-pill .stat-num {
+      font-size: 14px;
+      font-weight: 700;
+      color: #fff;
     }
-    .section-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
-
-    /* Steps */
-    .steps { display: flex; flex-direction: column; gap: 2px; margin-bottom: 24px; }
-    .step {
-      display: flex; align-items: center; gap: 14px;
-      background: var(--surface); border: 1px solid var(--border);
-      border-radius: 10px; padding: 14px 16px; transition: border-color 0.3s;
+    .stat-pill .stat-lbl {
+      font-size: 11px;
+      color: #555;
     }
-    .step.active { border-color: var(--green); }
-    .step.done   { border-color: #1e3a1e; }
-    .step-icon { font-size: 20px; flex-shrink: 0; width: 32px; text-align: center; }
-    .step-info { flex: 1; }
-    .step-name { font-size: 13px; font-weight: 600; color: #fff; margin-bottom: 2px; }
-    .step-desc { font-size: 11px; color: var(--muted); }
-    .step-status { font-family: 'Space Mono', monospace; font-size: 10px; padding: 3px 8px; border-radius: 4px; letter-spacing: 0.5px; }
-    .step-status.idle    { background: #1a1a1a; color: var(--muted); }
-    .step-status.running { background: rgba(0,230,118,0.15); color: var(--green); }
-    .step-status.done    { background: rgba(0,230,118,0.08); color: #2e7d32; }
-    .step-status.error   { background: rgba(244,67,54,0.1); color: var(--red); }
+    .stat-pill.bullish .stat-num { color: #00c853; }
+    .stat-pill.bearish .stat-num { color: #f44336; }
 
-    /* News feed */
-    .news-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 24px; }
-    .news-card {
-      background: var(--surface); border: 1px solid var(--border);
-      border-radius: 10px; padding: 14px 16px;
-      border-left: 3px solid var(--border);
+    /* Running indicator */
+    .running-bar {
+      display: none;
+      background: rgba(26,86,219,0.1);
+      border-bottom: 1px solid rgba(26,86,219,0.2);
+      padding: 8px 16px;
+      font-size: 12px;
+      color: #1a56db;
+      font-weight: 500;
+      text-align: center;
     }
-    .news-card.BULLISH { border-left-color: var(--green); }
-    .news-card.BEARISH { border-left-color: var(--red); }
-    .news-card.NEUTRAL { border-left-color: var(--muted); }
-    .news-card-top { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-    .news-ticker { font-family: 'Space Mono', monospace; font-size: 11px; font-weight: 700; color: #fff; background: #1a1a1a; padding: 2px 8px; border-radius: 4px; }
-    .news-sentiment { font-family: 'Space Mono', monospace; font-size: 9px; padding: 2px 6px; border-radius: 4px; }
-    .news-sentiment.BULLISH { background: rgba(0,230,118,0.15); color: var(--green); }
-    .news-sentiment.BEARISH { background: rgba(244,67,54,0.1); color: var(--red); }
-    .news-sentiment.NEUTRAL { background: #1a1a1a; color: var(--muted); }
-    .news-confidence { font-family: 'Space Mono', monospace; font-size: 9px; color: var(--muted); margin-left: auto; }
-    .news-headline { font-size: 13px; font-weight: 600; color: #fff; margin-bottom: 6px; line-height: 1.4; }
-    .news-summary { font-size: 11px; color: var(--muted); line-height: 1.5; margin-bottom: 8px; }
-    .news-footer { display: flex; align-items: center; gap: 8px; }
-    .news-source { font-size: 10px; color: #333; font-family: 'Space Mono', monospace; }
-    .news-time { font-size: 10px; color: #333; font-family: 'Space Mono', monospace; margin-left: auto; }
-    .news-link { font-size: 10px; color: var(--blue); text-decoration: none; }
-    .news-link:hover { text-decoration: underline; }
-
-    /* Log */
-    .log-container { background: #020408; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; margin-bottom: 24px; }
-    .log-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-bottom: 1px solid var(--border); background: var(--surface); }
-    .log-title { font-family: 'Space Mono', monospace; font-size: 10px; color: var(--muted); letter-spacing: 2px; text-transform: uppercase; }
-    .log-clear { background: none; border: none; color: var(--muted); font-size: 10px; cursor: pointer; font-family: 'Space Mono', monospace; }
-    .log-clear:hover { color: #fff; }
-    .log-entries { padding: 12px; max-height: 280px; overflow-y: auto; }
-    .log-entry { display: flex; gap: 10px; margin-bottom: 6px; font-family: 'Space Mono', monospace; font-size: 11px; line-height: 1.5; }
-    .log-time { color: #333; flex-shrink: 0; }
-    .log-msg { color: #888; }
-    .log-msg.success { color: var(--green); }
-    .log-msg.error   { color: var(--red); }
-    .log-msg.info    { color: var(--blue); }
-    .log-empty { font-family: 'Space Mono', monospace; font-size: 11px; color: #2a2a2a; text-align: center; padding: 20px; }
-
-    .empty-state { text-align: center; padding: 40px 20px; font-family: 'Space Mono', monospace; font-size: 12px; color: #2a2a2a; }
-    .last-updated { text-align: center; font-family: 'Space Mono', monospace; font-size: 10px; color: #2a2a2a; padding: 20px; letter-spacing: 1px; }
-    .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(100px); background: #111; border: 1px solid #333; color: #e8e8e8; padding: 12px 24px; border-radius: 10px; font-size: 13px; font-weight: 500; z-index: 9999; transition: transform 0.3s ease; white-space: nowrap; }
-    .toast.show { transform: translateX(-50%) translateY(0); }
-    ::-webkit-scrollbar { width: 4px; }
-    ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: #222; border-radius: 2px; }
+    .running-bar.show { display: block; }
+    .running-dot {
+      display: inline-block;
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: #1a56db;
+      margin-right: 6px;
+      animation: pulse 1s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; } 50% { opacity: 0.3; }
+    }
   </style>
 </head>
 <body>
+
 <div id="toast" class="toast"></div>
-<div class="page">
+
+<div id="pipeline-page">
 
   <!-- Header -->
-  <div class="header">
-    <div class="header-left">
-      <button class="back-btn" onclick="window.location.href='/'">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
-        Back
-      </button>
-      <div class="page-title">TEST PIPELINE</div>
-      <span class="badge">TEST2</span>
+  <div class="pipeline-header">
+    <div class="pipeline-top-bar">
+      <div class="pipeline-left">
+        <button class="back-btn" onclick="window.location.href='/'">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <polyline points="15 18 9 12 15 6"/>
+          </svg>
+          Back
+        </button>
+        <div class="pipeline-title">Test Pipeline</div>
+      </div>
+      <button class="run-btn" id="run-btn" onclick="triggerPipeline()">▶ Run Now</button>
     </div>
-    <button class="run-btn" id="run-btn" onclick="triggerPipeline()">▶ RUN NOW</button>
-  </div>
 
-  <!-- Status bar -->
-  <div class="status-bar">
-    <div class="status-dot idle" id="status-dot"></div>
-    <div class="status-text" id="status-text"><strong>Idle</strong> — waiting</div>
-  </div>
+    <!-- Stock tabs -->
+    <div class="stock-tabs" id="stock-tabs"></div>
 
-  <!-- Stats -->
-  <div class="stats-grid">
-    <div class="stat-card">
-      <div class="stat-value" id="stat-total">—</div>
-      <div class="stat-label">Total Articles</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-value" id="stat-bullish" style="color:#00e676">—</div>
-      <div class="stat-label">Bullish</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-value" id="stat-bearish" style="color:#f44336">—</div>
-      <div class="stat-label">Bearish</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-value" id="stat-updated">—</div>
-      <div class="stat-label">Last Run</div>
+    <!-- Sentiment filters -->
+    <div class="sentiment-filters">
+      <button class="sentiment-btn bullish" onclick="filterBySentiment('BULLISH')">Bullish</button>
+      <button class="sentiment-btn bearish" onclick="filterBySentiment('BEARISH')">Bearish</button>
+      <button class="sentiment-btn neutral active" onclick="filterBySentiment('all')">All</button>
     </div>
   </div>
 
-  <!-- Pipeline Steps -->
-  <div class="section">
-    <div class="section-title">Pipeline Steps</div>
-    <div class="steps">
-      <div class="step" id="step-ingest">
-        <div class="step-icon">📡</div>
-        <div class="step-info">
-          <div class="step-name">Step 1 — Ingest</div>
-          <div class="step-desc">Fetches news from Finnhub for all tracked stocks every 60s</div>
-        </div>
-        <div class="step-status idle" id="step-1-status">IDLE</div>
-      </div>
-      <div class="step" id="step-filter">
-        <div class="step-icon">🧹</div>
-        <div class="step-info">
-          <div class="step-name">Step 2 — Filter</div>
-          <div class="step-desc">Drops stale (6hrs+), duplicate, and already-stored articles</div>
-        </div>
-        <div class="step-status idle" id="step-2-status">IDLE</div>
-      </div>
-      <div class="step" id="step-tag">
-        <div class="step-icon">🏷️</div>
-        <div class="step-info">
-          <div class="step-name">Step 3 — Tag Sentiment</div>
-          <div class="step-desc">Keyword rules first, then GPT-4o-mini for ambiguous headlines</div>
-        </div>
-        <div class="step-status idle" id="step-3-status">IDLE</div>
-      </div>
-      <div class="step" id="step-map">
-        <div class="step-icon">🔗</div>
-        <div class="step-info">
-          <div class="step-name">Step 4 — Map Ticker</div>
-          <div class="step-desc">Exact word boundary match — fixes RCAT/CAT mismatch bug</div>
-        </div>
-        <div class="step-status idle" id="step-4-status">IDLE</div>
-      </div>
-      <div class="step" id="step-store">
-        <div class="step-icon">🗄️</div>
-        <div class="step-info">
-          <div class="step-name">Step 5 — Store</div>
-          <div class="step-desc">Saves processed articles to PostgreSQL database</div>
-        </div>
-        <div class="step-status idle" id="step-5-status">IDLE</div>
-      </div>
+  <!-- Running indicator -->
+  <div class="running-bar" id="running-bar">
+    <span class="running-dot"></span> Pipeline is running — fetching and tagging news...
+  </div>
+
+  <!-- Stats bar -->
+  <div class="stats-bar">
+    <div class="stat-pill">
+      <span class="stat-num" id="stat-total">—</span>
+      <span class="stat-lbl">articles</span>
+    </div>
+    <div class="stat-pill bullish">
+      <span class="stat-num" id="stat-bullish">—</span>
+      <span class="stat-lbl">bullish</span>
+    </div>
+    <div class="stat-pill bearish">
+      <span class="stat-num" id="stat-bearish">—</span>
+      <span class="stat-lbl">bearish</span>
+    </div>
+    <div class="stat-pill">
+      <span class="stat-num" id="stat-updated">—</span>
+      <span class="stat-lbl">last run</span>
     </div>
   </div>
 
-  <!-- Latest Articles -->
-  <div class="section">
-    <div class="section-title">Latest Articles from Test Pipeline</div>
-    <div class="news-list" id="news-list">
-      <div class="empty-state">No articles yet — run the pipeline to fetch news</div>
-    </div>
-  </div>
+  <!-- News grid -->
+  <main id="news-grid" class="news-grid">
+    <div class="loading">Hit ▶ Run Now to fetch news from the test pipeline.</div>
+  </main>
 
-  <!-- Live Log -->
-  <div class="section">
-    <div class="section-title">Live Log</div>
-    <div class="log-container">
-      <div class="log-header">
-        <div class="log-title">Pipeline Log</div>
-        <button class="log-clear" onclick="clearLogs()">CLEAR</button>
-      </div>
-      <div class="log-entries" id="log-entries">
-        <div class="log-empty">No logs yet.</div>
-      </div>
-    </div>
-  </div>
+</div>
 
-  <div class="last-updated" id="footer">Auto-refreshes every 5 seconds</div>
+<!-- Add stock modal search -->
+<div class="search-wrap" id="search-wrap" style="display:none; position:fixed; top:0; left:0; right:0; z-index:200; padding:12px 16px; background:#000; border-bottom:1px solid #1a1a1a;">
+  <div class="search-inner">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="2.5" style="flex-shrink:0">
+      <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+    </svg>
+    <input id="stock-search" class="search-bar" type="text"
+      placeholder="Add stock (e.g. AAPL, TSLA...)"
+      oninput="showSuggestions()"
+      onkeydown="handleSearchKey(event)"
+      spellcheck="false" autocomplete="off" />
+    <button class="search-close" onclick="closeSearch()">✕</button>
+  </div>
+  <div id="suggestions" class="suggestions"></div>
 </div>
 
 <script>
   const API_BASE = 'https://market-newss-production.up.railway.app';
   const token = localStorage.getItem('token');
   if (!token) window.location.href = '/';
+
+  let currentSentiment = 'all';
+  let currentTicker = 'all';
+  let allArticles = [];
+  let trackedTickers = ['TSLA','CAT','UBER','LLY','AAPL','MSFT','NVDA','RELIANCE','TCS','INFY'];
+
+  const STOCK_SUGGESTIONS = [
+    { symbol: 'AAPL', name: 'Apple' },
+    { symbol: 'TSLA', name: 'Tesla' },
+    { symbol: 'GOOGL', name: 'Google' },
+    { symbol: 'MSFT', name: 'Microsoft' },
+    { symbol: 'AMZN', name: 'Amazon' },
+    { symbol: 'META', name: 'Meta' },
+    { symbol: 'NVDA', name: 'Nvidia' },
+    { symbol: 'NFLX', name: 'Netflix' },
+    { symbol: 'UBER', name: 'Uber' },
+    { symbol: 'LLY', name: 'Eli Lilly' },
+    { symbol: 'CAT', name: 'Caterpillar' },
+    { symbol: 'RCAT', name: 'Red Cat Holdings' },
+    { symbol: 'TCS', name: 'TCS' },
+    { symbol: 'RELIANCE', name: 'Reliance' },
+    { symbol: 'INFY', name: 'Infosys' },
+    { symbol: 'HDFCBANK', name: 'HDFC Bank' },
+    { symbol: 'SBIN', name: 'SBI' },
+    { symbol: 'IRFC', name: 'IRFC' },
+    { symbol: 'RVNL', name: 'RVNL' },
+  ];
+
+  function authHeaders() {
+    return { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` };
+  }
 
   function showToast(msg) {
     const t = document.getElementById('toast');
@@ -287,22 +245,13 @@
     setTimeout(() => t.classList.remove('show'), 3000);
   }
 
-  function authHeaders() {
-    return { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` };
-  }
-
   function timeAgo(dateStr) {
-    if (!dateStr) return '—';
+    if (!dateStr) return '';
     const diff = (Date.now() - new Date(dateStr)) / 1000;
     if (diff < 60) return 'just now';
     if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
     if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
     return `${Math.floor(diff / 86400)}d ago`;
-  }
-
-  function formatTime(isoStr) {
-    if (!isoStr) return '';
-    return new Date(isoStr).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   }
 
   // ── Fetch status ──────────────────────────────────────────────────────
@@ -311,145 +260,177 @@
       const res = await fetch(`${API_BASE}/api/pipeline2/status`, { headers: authHeaders() });
       if (!res.ok) return;
       const data = await res.json();
-      renderStatus(data);
+
+      // Update running bar
+      const runningBar = document.getElementById('running-bar');
+      const runBtn = document.getElementById('run-btn');
+      if (data.isRunning) {
+        runningBar.classList.add('show');
+        runBtn.disabled = true;
+        runBtn.textContent = 'Running...';
+      } else {
+        runningBar.classList.remove('show');
+        runBtn.disabled = false;
+        runBtn.textContent = '▶ Run Now';
+      }
+
+      // Stats
+      document.getElementById('stat-total').textContent   = data.totalArticles ?? '—';
+      document.getElementById('stat-bullish').textContent = data.bullishCount ?? '—';
+      document.getElementById('stat-bearish').textContent = data.bearishCount ?? '—';
+      document.getElementById('stat-updated').textContent = timeAgo(data.lastUpdated) || '—';
+
+      // Store articles and render
+      if (data.articles && data.articles.length > 0) {
+        allArticles = data.articles;
+        renderNews();
+      }
+
     } catch (e) {
       console.error('Status fetch failed:', e.message);
     }
   }
 
-  function renderStatus(data) {
-    const dot = document.getElementById('status-dot');
-    const statusText = document.getElementById('status-text');
+  // ── Render news cards — same style as main app ────────────────────────
+  function renderNews() {
+    const grid = document.getElementById('news-grid');
+    let news = allArticles;
 
-    if (data.isRunning) {
-      dot.className = 'status-dot running';
-      statusText.innerHTML = '<strong style="color:#00e676">Running</strong> — pipeline is processing...';
-      document.getElementById('run-btn').disabled = true;
-      animateSteps(true);
-    } else {
-      dot.className = 'status-dot idle';
-      statusText.innerHTML = `<strong>Idle</strong> — last run ${timeAgo(data.lastUpdated)}`;
-      document.getElementById('run-btn').disabled = false;
-      animateSteps(false);
+    // Filter by ticker
+    if (currentTicker !== 'all') {
+      news = news.filter(a => a.ticker === currentTicker);
     }
 
-    // Stats
-    document.getElementById('stat-total').textContent   = data.totalArticles ?? '—';
-    document.getElementById('stat-bullish').textContent = data.bullishCount ?? '—';
-    document.getElementById('stat-bearish').textContent = data.bearishCount ?? '—';
-    document.getElementById('stat-updated').textContent = timeAgo(data.lastUpdated);
+    // Filter by sentiment
+    if (currentSentiment !== 'all') {
+      news = news.filter(a => a.sentiment === currentSentiment);
+    }
 
-    // News feed
-    renderNews(data.articles || []);
-
-    // Logs
-    renderLogs(data.logs || []);
-
-    document.getElementById('footer').textContent = `Last fetched: ${new Date().toLocaleTimeString('en-IN')}`;
-  }
-
-  function renderNews(articles) {
-    const container = document.getElementById('news-list');
-    if (!articles || articles.length === 0) {
-      container.innerHTML = '<div class="empty-state">No articles yet — run the pipeline to fetch news</div>';
+    if (news.length === 0) {
+      grid.innerHTML = '<div class="loading">No articles yet — hit ▶ Run Now to fetch news.</div>';
       return;
     }
-    container.innerHTML = articles.map(a => `
-      <div class="news-card ${a.sentiment}">
-        <div class="news-card-top">
-          <span class="news-ticker">${a.ticker}</span>
-          <span class="news-sentiment ${a.sentiment}">${a.sentiment}</span>
-          <span class="news-confidence">${a.confidence ?? 0}%</span>
-        </div>
-        <div class="news-headline">${a.headline}</div>
-        ${a.summary ? `<div class="news-summary">${a.summary}</div>` : ''}
-        <div class="news-footer">
-          <span class="news-source">${a.source || ''}</span>
-          <span class="news-time">${timeAgo(a.published_at)}</span>
-          ${a.source_url ? `<a class="news-link" href="${a.source_url}" target="_blank">Read →</a>` : ''}
-        </div>
-      </div>
-    `).join('');
-  }
 
-  function renderLogs(logs) {
-    const container = document.getElementById('log-entries');
-    if (!logs || logs.length === 0) {
-      container.innerHTML = '<div class="log-empty">No logs yet.</div>';
-      return;
-    }
-    container.innerHTML = logs.map(log => {
-      const msg = log.msg || '';
-      let cls = '';
-      if (msg.includes('✓') || msg.includes('saved') || msg.includes('complete')) cls = 'success';
-      else if (msg.includes('error') || msg.includes('Error') || msg.includes('failed')) cls = 'error';
-      else if (msg.includes('started') || msg.includes('triggered') || msg.includes('Running')) cls = 'info';
+    grid.innerHTML = news.map(item => {
+      const sentiment = (item.sentiment || 'neutral').toLowerCase();
+      const sentimentLabel = sentiment === 'bullish' ? 'Bullish' : sentiment === 'bearish' ? 'Bearish' : 'Neutral';
       return `
-        <div class="log-entry">
-          <div class="log-time">${formatTime(log.time)}</div>
-          <div class="log-msg ${cls}">${msg}</div>
+      <div class="news-card ${sentiment}">
+        <div class="card-body">
+          <div class="card-meta">
+            <span class="stock-badge">${item.ticker || 'GLOBAL'}</span>
+            <span class="time-label">${timeAgo(item.published_at)}</span>
+            <span class="time-label" style="color:#555;font-size:9px">${item.confidence ?? 0}% conf</span>
+          </div>
+          <div class="card-headline"
+            onclick="${item.source_url ? `window.open('${item.source_url}','_blank')` : ''}"
+            style="${item.source_url ? 'cursor:pointer' : ''}"
+          >${item.headline || ''}</div>
+          <div class="card-story">${item.summary || 'Real-time signal from test pipeline.'}</div>
+          <div class="sentiment-tag ${sentiment}">${sentimentLabel}</div>
+          <div class="card-source">${item.source || 'MarketPulse Test Pipeline'}${item.source_url ? ` · <a href="${item.source_url}" target="_blank" style="color:#1a56db;text-decoration:none">Read →</a>` : ''}</div>
         </div>
-      `;
+      </div>`;
     }).join('');
   }
 
-  let stepsAnimating = false;
-  function animateSteps(running) {
-    const stepIds    = ['step-ingest','step-filter','step-tag','step-map','step-store'];
-    const statusIds  = ['step-1-status','step-2-status','step-3-status','step-4-status','step-5-status'];
-    const labels     = ['FETCHING','FILTERING','TAGGING','MAPPING','SAVING'];
+  // ── Stock tabs ────────────────────────────────────────────────────────
+  function renderStockTabs() {
+    const container = document.getElementById('stock-tabs');
+    const tickerTabs = trackedTickers.map(t => `
+      <button class="tab ${currentTicker === t ? 'active' : ''}" onclick="filterByTicker('${t}')">${t}</button>
+    `).join('');
 
-    if (!running) {
-      stepIds.forEach((id, i) => {
-        document.getElementById(id)?.classList.remove('active');
-        const s = document.getElementById(statusIds[i]);
-        if (s) { s.className = 'step-status idle'; s.textContent = 'IDLE'; }
-      });
-      stepsAnimating = false;
-      return;
+    container.innerHTML = `
+      <button class="tab ${currentTicker === 'all' ? 'active' : ''}" onclick="filterByTicker('all')">All</button>
+      ${tickerTabs}
+      <button class="tab-add" onclick="openAddStock()">+ Add</button>
+    `;
+  }
+
+  function filterByTicker(ticker) {
+    currentTicker = ticker;
+    renderStockTabs();
+    renderNews();
+  }
+
+  function filterBySentiment(sentiment) {
+    currentSentiment = currentSentiment === sentiment ? 'all' : sentiment;
+    document.querySelectorAll('.sentiment-btn').forEach(b => b.classList.remove('active'));
+    if (currentSentiment === 'all') {
+      document.querySelector('.sentiment-btn.neutral').classList.add('active');
+    } else {
+      document.querySelector(`.sentiment-btn.${sentiment.toLowerCase()}`)?.classList.add('active');
     }
+    renderNews();
+  }
 
-    if (stepsAnimating) return;
-    stepsAnimating = true;
-    let step = 0;
+  // ── Add stock ─────────────────────────────────────────────────────────
+  function openAddStock() {
+    document.getElementById('search-wrap').style.display = 'block';
+    setTimeout(() => document.getElementById('stock-search').focus(), 100);
+  }
 
-    function nextStep() {
-      if (!stepsAnimating) return;
-      if (step > 0) {
-        document.getElementById(stepIds[step-1])?.classList.remove('active');
-        const prev = document.getElementById(statusIds[step-1]);
-        if (prev) { prev.className = 'step-status done'; prev.textContent = 'DONE'; }
-      }
-      if (step >= stepIds.length) return;
-      document.getElementById(stepIds[step])?.classList.add('active');
-      const s = document.getElementById(statusIds[step]);
-      if (s) { s.className = 'step-status running'; s.textContent = labels[step]; }
-      step++;
-      setTimeout(nextStep, 3000);
+  function closeSearch() {
+    document.getElementById('search-wrap').style.display = 'none';
+    document.getElementById('stock-search').value = '';
+    document.getElementById('suggestions').innerHTML = '';
+  }
+
+  function showSuggestions() {
+    const val = document.getElementById('stock-search').value.trim().toUpperCase();
+    const container = document.getElementById('suggestions');
+    if (!val) { container.innerHTML = ''; return; }
+
+    const matches = STOCK_SUGGESTIONS.filter(s =>
+      s.symbol.startsWith(val) || s.name.toUpperCase().includes(val)
+    ).slice(0, 5);
+
+    const addNew = `<div class="suggestion-item" onclick="addTicker('${val}')">➕ Add "${val}" <span>new</span></div>`;
+    const options = matches.map(s =>
+      `<div class="suggestion-item" onclick="addTicker('${s.symbol}')">${s.symbol} <span>${s.name}</span></div>`
+    ).join('');
+    container.innerHTML = addNew + options;
+  }
+
+  function handleSearchKey(e) {
+    if (e.key === 'Enter') {
+      const val = document.getElementById('stock-search').value.trim().toUpperCase();
+      if (val) addTicker(val);
     }
-    nextStep();
+  }
+
+  function addTicker(symbol) {
+    if (!trackedTickers.includes(symbol)) {
+      trackedTickers.push(symbol);
+    }
+    currentTicker = symbol;
+    closeSearch();
+    renderStockTabs();
+    showToast(`${symbol} added — run pipeline to fetch news`);
   }
 
   // ── Trigger pipeline ──────────────────────────────────────────────────
   async function triggerPipeline() {
     try {
       document.getElementById('run-btn').disabled = true;
+      document.getElementById('run-btn').textContent = 'Running...';
       const res = await fetch(`${API_BASE}/api/pipeline2/run`, {
         method: 'POST', headers: authHeaders()
       });
       const data = await res.json();
       showToast(data.message || 'Pipeline triggered ✓');
-      setTimeout(fetchStatus, 1500);
+      document.getElementById('running-bar').classList.add('show');
+      setTimeout(fetchStatus, 2000);
     } catch (e) {
       showToast('Could not trigger pipeline');
       document.getElementById('run-btn').disabled = false;
+      document.getElementById('run-btn').textContent = '▶ Run Now';
     }
   }
 
-  function clearLogs() {
-    document.getElementById('log-entries').innerHTML = '<div class="log-empty">Logs cleared.</div>';
-  }
-
+  // ── Init ──────────────────────────────────────────────────────────────
+  renderStockTabs();
   fetchStatus();
   setInterval(fetchStatus, 5000);
 </script>
