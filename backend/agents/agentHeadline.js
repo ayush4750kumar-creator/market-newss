@@ -1,5 +1,5 @@
 const axios  = require('axios');
-const config = require('../config');
+const GROQ_API_KEY = process.env.GROQ_API_KEY;
 
 function stripSource(h) {
   if (!h) return '';
@@ -11,7 +11,7 @@ function stripSource(h) {
 
 async function rewriteHeadline(rawHeadline, ticker) {
   const clean = stripSource(rawHeadline);
-  if (!config.GROQ_API_KEY) return clean;
+  if (!GROQ_API_KEY) return clean;
   try {
     const res = await axios.post(
       'https://api.groq.com/openai/v1/chat/completions',
@@ -24,7 +24,7 @@ async function rewriteHeadline(rawHeadline, ticker) {
           { role: 'user', content: `Rewrite for stock ${ticker}. Max 8 words. Must be DIFFERENT from original. No source names. Be direct and punchy. Do not start with Is/Will/Can/Could/Why/How.\n\nOriginal: "${clean}"\n\nRewritten headline:` },
         ],
       },
-      { headers: { Authorization: `Bearer ${config.GROQ_API_KEY}`, 'Content-Type': 'application/json' } }
+      { headers: { Authorization: `Bearer ${GROQ_API_KEY}`, 'Content-Type': 'application/json' } }
     );
     const result = res.data.choices[0].message.content.trim().replace(/^["']|["']$/g, '').replace(/\.$/, '').trim();
     if (result && result.length > 5 && result.toLowerCase() !== clean.toLowerCase()) return result;
