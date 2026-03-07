@@ -1,14 +1,11 @@
-// backend/routes/pipeline2.js
-// Test pipeline — reuses existing newsFetcher (Google News RSS)
 // Mounted at /api/pipeline2 in server.js
 
-const express  = require('express');
-const router   = express.Router();
-const OpenAI   = require('openai');
+const express = require('express');
+const router  = express.Router();
+const axios   = require('axios');
+const config  = require('../config');
 const { fetchFinnhubStock } = require('../services/newsFetcher');
 const { authenticate }      = require('./auth');
-
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 // ── In-memory state ───────────────────────────────────────────────────────
 let state = {
@@ -27,15 +24,15 @@ function addLog(msg) {
   if (state.logs.length > 100) state.logs.pop();
 }
 
-// ── Sentiment keyword rules ───────────────────────────────────────────────
-const BEARISH = [
+// ── Sentiment keyword fallback ────────────────────────────────────────────
+const BEARISH_WORDS = [
   'falls','fall','drops','drop','plunges','plunge','declines','decline',
   'lowers','lower','cuts','cut','misses','miss','downgrade','downgrades',
   'selloff','sell-off','tumbles','tumble','slumps','slump','loss','losses',
   'warning','layoffs','layoff','fraud','investigation','penalty','fine',
   'resigned','bankruptcy','recall','lawsuit','suspended','halted','crash',
 ];
-const BULLISH = [
+const BULLISH_WORDS = [
   'surges','surge','jumps','jump','soars','soar','raises','raise',
   'upgrades','upgrade','beats','beat','record','all-time high','profit',
   'wins','win','partnership','contract','expansion','dividend','buyback',
@@ -43,46 +40,100 @@ const BULLISH = [
   'breakout','growth','rises','rise','climbs','climb','strong earnings',
 ];
 
-function tagSentiment(headline) {
+function keywordSentiment(headline) {
   const lower = headline.toLowerCase();
-  for (const w of BEARISH) {
-    if (new RegExp(`\\b${w}\\b`, 'i').test(lower))
-      return { sentiment: 'BEARISH', confidence: 95 };
+  for (const w of BEARISH_WORDS) {
+    if (new RegExp(`\\b${w}\\b`, 'i').test(lower)) return 'BEARISH';
   }
-  for (const w of BULLISH) {
-    if (new RegExp(`\\b${w}\\b`, 'i').test(lower))
-      return { sentiment: 'BULLISH', confidence: 95 };
+  for (const w of BULLISH_WORDS) {
+    if (new RegExp(`\\b${w}\\b`, 'i').test(lower)) return 'BULLISH';
   }
-  return { sentiment: 'NEUTRAL', confidence: 70 };
+  return 'NEUTRAL';
 }
 
-// ── OpenAI plain English summary ──────────────────────────────────────────
-async function generateSummary(headline, ticker) {
-  if (!process.env.OPENAI_API_KEY) return null;
+// ── Groq AI: analyze + summarize ─────────────────────────────────────────
+async function analyzeWithGroq(headline, ticker) {
+  if (!config.GROQ_API_KEY) return null;
+
   try {
-    const res = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      max_tokens: 60,
-      messages: [
-        {
-          role: 'system',
-          content: `You explain stock news to beginner Indian retail investors in simple plain English.
-Write ONE sentence (max 20 words) explaining what this news means for the stock.
-Be direct. No jargon. No filler words like "This means" or "In summary".
-Examples:
-- "Analyst upgraded the stock — price may rise short term."
-- "Company missed earnings targets — stock could fall this week."
-- "New government contract won — positive signal for investors."`,
-        },
-        {
-          role: 'user',
-          content: `Stock: ${ticker}\nHeadline: "${headline}"`,
-        },
-      ],
-    });
-    return res.choices[0].message.content.trim().replace(/^"|"$/g, '');
+    const response = await axios.post(
+      'https://api.groq.com/openai/v1/chat/completions',
+      {
+        model: 'llama-3.3-70b-versatile',
+        max_tokens: 120,
+        temperature: 0.2,
+        messages: [
+          {
+            role: 'system',
+            content: `You are a financial analyst explaining stock news to beginner Indian retail investors.
+Always respond with valid JSON only. No markdown, no extra text.`
+          },
+          {
+            role: 'user',
+            content: `Stock: ${ticker}
+Headline: "${headline}"
+
+Return JSON with:
+- sentiment: "BULLISH", "BEARISH", or "NEUTRAL"
+- confidence: number 0-100
+- summary: ONE simple sentence (max 20 words) explaining what this means for the stock. No jargon.
+- shortHeadline: rewrite headline in under 8 words, clear and punchy
+
+Example: {"sentiment":"BULLISH","confidence":88,"summary":"Strong earnings beat expectations — stock likely to rise.","shortHeadline":"Tesla Beats Earnings, Stock May Rise"}
+
+Return only JSON.`
+          }
+        ]
+      },
+      {
+        headers: {
+          'Authorization': `Bearer ${config.GROQ_API_KEY}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    const raw = response.data.choices[0].message.content.trim();
+    const parsed = JSON.parse(raw.replace(/```json|```/g, ''));
+    return {
+      sentiment:     (parsed.sentiment || 'NEUTRAL').toUpperCase(),
+      confidence:    parsed.confidence || 70,
+      summary:       parsed.summary || null,
+      shortHeadline: parsed.shortHeadline || headline.slice(0, 80),
+    };
+
   } catch (err) {
-    addLog(`Summary error: ${err.message}`);
+    // Rate limited — wait and retry once
+    if (err.response?.status === 429) {
+      addLog('Rate limited by Groq, waiting 5s...');
+      await new Promise(r => setTimeout(r, 5000));
+      try {
+        const retry = await axios.post(
+          'https://api.groq.com/openai/v1/chat/completions',
+          {
+            model: 'llama-3.3-70b-versatile',
+            max_tokens: 120,
+            temperature: 0.2,
+            messages: [
+              { role: 'system', content: 'You are a financial analyst. Always respond with valid JSON only.' },
+              { role: 'user', content: `Stock: ${ticker}\nHeadline: "${headline}"\nReturn JSON: {"sentiment":"NEUTRAL","confidence":70,"summary":"Market update for ${ticker}.","shortHeadline":"${headline.slice(0,50)}"}` }
+            ]
+          },
+          { headers: { 'Authorization': `Bearer ${config.GROQ_API_KEY}`, 'Content-Type': 'application/json' } }
+        );
+        const raw = retry.data.choices[0].message.content.trim();
+        const parsed = JSON.parse(raw.replace(/```json|```/g, ''));
+        return {
+          sentiment:     (parsed.sentiment || 'NEUTRAL').toUpperCase(),
+          confidence:    parsed.confidence || 70,
+          summary:       parsed.summary || null,
+          shortHeadline: parsed.shortHeadline || headline.slice(0, 80),
+        };
+      } catch {
+        return null;
+      }
+    }
+    addLog(`Groq error: ${err.message}`);
     return null;
   }
 }
@@ -101,7 +152,7 @@ async function runTestPipeline(tickers = DEFAULT_TICKERS) {
   try {
     const allRaw = [];
 
-    // Step 1 — fetch via existing Google News fetcher
+    // Step 1 — fetch news
     addLog('Fetching from Google News RSS...');
     for (const ticker of tickers) {
       const articles = await fetchFinnhubStock(ticker);
@@ -109,7 +160,7 @@ async function runTestPipeline(tickers = DEFAULT_TICKERS) {
       await new Promise(r => setTimeout(r, 200));
     }
 
-    // Step 2 — dedup against existing articles
+    // Step 2 — dedup
     const existingIds = new Set(state.articles.map(a => a.id));
     const fresh = allRaw.filter(a => !existingIds.has(a.id));
     addLog(`${fresh.length} new articles after dedup`);
@@ -121,29 +172,42 @@ async function runTestPipeline(tickers = DEFAULT_TICKERS) {
       return;
     }
 
-    // Step 3 — tag + summarize (limit 40 to control OpenAI cost)
-    addLog('Tagging sentiment and generating AI summaries...');
+    // Step 3 — Groq AI analysis in batches of 3 (same as agentB)
+    addLog('Running Groq AI analysis...');
     const processed = [];
+    const toProcess = fresh.slice(0, 40);
+    const batchSize = 3;
 
-    for (const a of fresh.slice(0, 40)) {
-      const headline = a.title || a.headline || '';
-      const ticker   = a.stock || 'GLOBAL';
-      const { sentiment, confidence } = tagSentiment(headline);
-      const summary = await generateSummary(headline, ticker);
+    for (let i = 0; i < toProcess.length; i += batchSize) {
+      const batch = toProcess.slice(i, i + batchSize);
+      addLog(`Batch ${Math.floor(i/batchSize)+1}/${Math.ceil(toProcess.length/batchSize)}...`);
 
-      processed.push({
-        id:           a.id,
-        ticker,
-        headline,
-        summary,
-        source:       (a.source || 'Google News').replace('Google News: ', ''),
-        source_url:   a.url || null,
-        sentiment,
-        confidence,
-        published_at: a.publishedAt || new Date().toISOString(),
-      });
+      const batchResults = await Promise.all(batch.map(async (a) => {
+        const headline = a.title || a.headline || '';
+        const ticker   = a.stock || 'GLOBAL';
 
-      await new Promise(r => setTimeout(r, 150));
+        // Try Groq AI first, fall back to keyword matching
+        const groq = await analyzeWithGroq(headline, ticker);
+
+        return {
+          id:           a.id,
+          ticker,
+          headline:     groq?.shortHeadline || headline.slice(0, 80),
+          summary:      groq?.summary || a.summary || a.story || headline,
+          source:       (a.source || 'Google News').replace('Google News: ', ''),
+          source_url:   a.url || null,
+          sentiment:    groq?.sentiment || keywordSentiment(headline),
+          confidence:   groq?.confidence || 70,
+          published_at: a.publishedAt || new Date().toISOString(),
+        };
+      }));
+
+      processed.push(...batchResults);
+
+      // 800ms between batches — same as agentB to avoid rate limits
+      if (i + batchSize < toProcess.length) {
+        await new Promise(r => setTimeout(r, 800));
+      }
     }
 
     // Update state
@@ -153,7 +217,7 @@ async function runTestPipeline(tickers = DEFAULT_TICKERS) {
     state.bearishCount  = state.articles.filter(a => a.sentiment === 'BEARISH').length;
     state.lastUpdated   = new Date().toISOString();
 
-    addLog(`Done ✓ — ${processed.length} articles processed`);
+    addLog(`Done ✓ — ${processed.length} articles processed with AI`);
 
   } catch (err) {
     addLog(`Error: ${err.message}`);
