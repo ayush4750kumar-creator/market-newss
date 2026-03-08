@@ -1,6 +1,7 @@
 const express               = require('express');
 const router                = express.Router();
 const { fetchFinnhubStock } = require('../services/newsFetcher');
+const { fetchNewsWithImages } = require('../services/newsDataFetcher');
 const { authenticate }      = require('./auth');
 const { runAgentDedup }     = require('../agents/agentDedup');
 const { rewriteHeadline }   = require('../agents/agentHeadline');
