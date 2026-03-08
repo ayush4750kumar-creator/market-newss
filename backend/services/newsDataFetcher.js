@@ -16,7 +16,11 @@ async function fetchNewsWithImages(tickers) {
       const articles = (res.data.results || []).slice(0, 5).map(a => ({
         id: `newsdata-${ticker}-${a.article_id}`,
         headline: a.title,
-        image_url: a.image_url || null,
+        image_url: (a.image_url && 
+          !a.image_url.includes('logo') && 
+          !a.image_url.includes('icon') &&
+          !a.image_url.includes('placeholder') &&
+          a.image_url.match(/\.(jpg|jpeg|png|webp)/i)) ? a.image_url : null,
         source: a.source_id || 'NewsData',
         source_url: a.link || null,
         published_at: a.pubDate || new Date().toISOString(),
