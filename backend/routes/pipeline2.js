@@ -28,10 +28,18 @@ async function runTestPipeline(tickers = DEFAULT_TICKERS) {
   try {
     const allRaw = [];
     addLog('Step 1: Fetching news...');
-    for (const ticker of tickers) {
-      const articles = await fetchFinnhubStock(ticker);
-      allRaw.push(...articles);
-      await new Promise(r => setTimeout(r, 150));
+    if (process.env.NEWSDATA_API_KEY) {
+      addLog('Using NewsData.io (real images)...');
+      const ndArticles = await fetchNewsWithImages(tickers);
+      allRaw.push(...ndArticles);
+      addLog(`NewsData: ${ndArticles.length} articles fetched`);
+    } else {
+      addLog('No NEWSDATA_API_KEY — using Google News');
+      for (const ticker of tickers) {
+        const articles = await fetchFinnhubStock(ticker);
+        allRaw.push(...articles);
+        await new Promise(r => setTimeout(r, 150));
+      }
     }
     addLog(`Fetched ${allRaw.length} raw articles`);
 
