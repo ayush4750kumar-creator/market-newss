@@ -84,7 +84,7 @@ async function runTestPipeline(tickers = DEFAULT_TICKERS) {
 
 router.get('/status', (req, res) => res.json({ isRunning: state.isRunning, lastUpdated: state.lastUpdated, totalArticles: state.totalArticles, bullishCount: state.bullishCount, bearishCount: state.bearishCount, articles: state.articles.slice(0, 60), logs: state.logs.slice(0, 20) }));
 router.post('/run', (req, res) => { if (state.isRunning) return res.json({ message: 'Already running' }); const tickers = (req.body && req.body.tickers) || DEFAULT_TICKERS; res.json({ message: 'Pipeline triggered' }); addLog('Manual trigger'); runTestPipeline(tickers); });
-router.post('/reset', authenticate, (req, res) => { resetState(); res.json({ message: 'Reset done' }); });
+router.post('/reset', (req, res) => { resetState(); res.json({ message: 'Reset done' }); });
 router.get('/logs', (req, res) => res.json({ logs: state.logs }));
 
 module.exports = { router, addLog };
