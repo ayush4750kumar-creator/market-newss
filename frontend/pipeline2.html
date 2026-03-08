@@ -363,7 +363,6 @@
       const sentiment = (item.sentiment || 'neutral').toLowerCase();
       const sentimentLabel = sentiment === 'bullish' ? 'Bullish' : sentiment === 'bearish' ? 'Bearish' : 'Neutral';
       return `
-      return `
       <div class="news-card ${sentiment}">
         ${item.image_url ? `<img class="card-image" src="${item.image_url}" onerror="this.style.display='none'" loading="lazy" />` : `<div class="card-image-placeholder">${sentiment === 'bullish' ? '📈' : sentiment === 'bearish' ? '📉' : '📊'}</div>`}
         <div class="card-body">
