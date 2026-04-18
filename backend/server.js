@@ -8,7 +8,6 @@ app.use(cors());
 app.use(express.json());
 
 app.use('/api/auth', authRouter);
-app.use('/api/pipeline2', require('./routes/pipeline2').router);
 
 app.get('/api/status', (req, res) => {
   res.json({ status: 'ok', time: new Date().toISOString() });
